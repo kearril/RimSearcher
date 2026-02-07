@@ -1,51 +1,105 @@
-﻿# 🧊 RimSearcher
+﻿# RimSearcher: RimWorld 源码分析 MCP 服务器
 
-RimSearcher 是一个专为 **RimWorld** 开发者打造的深度源码洞察服务器。基于 Anthropic 的 **Model Context Protocol (MCP)** 协议，它能将 RimWorld 庞大的 C# 源码库与复杂的 XML Def 体系结构化地“喂”给 AI 助手（如 Claude），使其具备超越普通开发者的代码理解与数据检索能力。
+RimSearcher 是一个基于 Model Context Protocol (MCP) 实现的专用服务器，旨在为 AI 助手（如 Gemini, Claude 等）提供对 RimWorld
+游戏源码（C#）和配置文件（XML）的高效检索与深度分析能力。
 
-## 🌟 核心优势：为什么它如此强大？
+本项目使用了Gemini辅助完成.
 
-与传统的文件搜索不同，RimSearcher 理解 RimWorld 的**领域逻辑**：
+---
 
-- **XML 继承全解析**：RimWorld 的 Def 广泛使用 ParentName 继承。RimSearcher 能够实时递归向上溯源，为你呈现合并后的最终 XML 数据，彻底告别在几十个文件间手动追踪属性的痛苦。
-- **C# 与 XML 的深度联动**：当你查看一个 ThingDef 时，RimSearcher 会自动扫描并定位与其关联的 	hingClass、compClass 或 workerClass 源码路径。
-- **符号级继承追踪**：支持跨文件计算 C# 类的完整继承链，并能瞬间找出一个基类在全域范围内的所有派生子类。
-- **工业级稳定性**：内置 Stdout 劫持保护技术，确保任何意外的日志输出都不会破坏 MCP 通信协议，在高强度 AI 对话中依然坚如磐石。
+## 1. MCP 特点
 
-## 🧰 神兵利器：工具箱说明
+* **高性能索引**：采用内存预扫描机制，支持对数万个 C# 文件和 XML Defs 的秒级检索。
+* **低 Token 损耗**：
+    * **精准定位**：直接返回方法体或特定的 XML 节点，避免传输冗余代码。
+    * **分页机制**：源码读取支持行范围限制，防止上下文溢出。
+* **智能 XML 解析**：支持 RimWorld 特有的 XML 继承逻辑（Abstract/ParentName），能够返回解析后的最终属性。
+* **协议标准**：遵循 JSON-RPC 2.0 规范，通过标准输入输出（Stdio）与客户端通信，具有良好的兼容性。
+* **项目已完整打包**：提供了编译好的单文件可执行程序，用户只需安装 .net 10 CKD即可使用。
 
-| 工具 | 强大之处 | 典型用例 |
-| :--- | :--- | :--- |
-| **locate** | **全域定位**：不仅搜文件名，还能跨越 C# 类型名、DefName 和 Label 进行模糊匹配。 | "找到所有包含 'Revolver' 的资源" |
-| **inspect** | **深度透视**：对 XML 执行继承合并；对 C# 提供 Mermaid 继承图及类结构大纲。 | "解析这个 Def 的最终属性，并展示它的类大纲" |
-| **ead_code** | **精准读取**：支持利用 Roslyn 引擎按方法名提取代码，或分页读取超长文件。 | "读取 Pawn 类中 TryGetAttackTarget 方法的实现" |
-| **	race** | **关联追踪**：寻找符号的所有引用位置，或列出某个抽象基类的所有具体实现。 | "有哪些类继承自 CompProperties？" |
-| **search_regex** | **正则搜索**：在数万个源码文件中进行高性能的正则表达式内容匹配。 | "搜索所有使用了特定字段的 XML 节点" |
-| **list_directory** | **结构浏览**：安全地探索授权目录下的文件层级。 | "看看这个 Mod 的文件夹结构" |
+---
 
-## 🛠️ 快速上手
+## 2. 工具能力
 
-### 1. 构建
-确保安装了 [.NET 10.0 SDK](https://dotnet.microsoft.com/download/dotnet/10.0)，在 Sources 目录下运行：
-`powershell
-dotnet publish -c Release
-`
+RimSearcher 暴露了以下核心工具供 AI 调用：
 
-### 2. 配置
-在 Sources/Publish/config.json 中配置你的源码路径：
-`json
+* **locate**: 快速定位。通过名称查找特定的 ThingDef 或 C# 类型定义。
+* **inspect**: 深度查看。获取完整的 XML 定义（含继承解析）或 C# 类的成员结构。
+* **read_code**: 智能读取。支持按方法名提取函数体，或根据行号进行分页读取。
+* **search_regex**: 全局搜索。在全库范围内使用正则表达式匹配内容。
+* **trace**: 引用追踪。分析特定 C# 类型或 XML Def 的引用关系。
+* **list_directory**: 目录导航。探索源码库的文件层级结构。
+
+---
+
+## 3. 技术栈
+
+* **开发语言**: C# 14
+* **运行时**: .NET 10.0
+* **核心库**:
+    * **Microsoft.CodeAnalysis.CSharp (Roslyn)**: 用于深度的 C# 语法树分析和方法体提取，能够像ide一样优雅得搜索相关引用和处理类的继承。
+    * **System.Text.Json**: 高性能 JSON 序列化与协议解析。
+    * **Microsoft.Extensions.Logging**: 标准化日志系统（日志输出至 stderr 以避免干扰协议流）。
+* **项目架构**:
+    * `RimSearcher.Core`: 包含索引引擎、Roslyn 辅助类及 XML 解析逻辑。
+    * `RimSearcher.Server`: 负责 MCP 协议实现、工具注册及进程间通信。
+
+---
+
+## 4. 如何使用
+
+* ### 前置要求
+* 安装 .NET 10 SDK（这个可以在微软官网安装或者在你的ide里自动安装）
+
+* ### 下载最新的.exe文件
+* 访问 **[Releases](https://github.com/kearril/RimSearcher/releases)** 页面，下载最新版本的 RimSearcher.Server.exe 文件。
+
+* ### 配置源码路径
+* 新创建一个文件夹，将这个.exe文件放入其中，并在同一目录下创建一个名为 `config.json` 的文件，内容如下：
+
+```json
 {
-  "CsharpSourcePaths": ["D:/Source/RimWorld_Decompiled"],
-  "XmlSourcePaths": ["D:/Steam/steamapps/common/RimWorld/Data"]
+  "CsharpSourcePaths": [
+    "C:/Path/To/Your/RimWorld/Source"
+  ],
+  "XmlSourcePaths": [
+    "C:/SteamLibrary/steamapps/common/RimWorld/Data"
+  ]
 }
-`
+```
 
-### 3. 接入
-在 Claude Desktop 配置中指向 mcp.json 即可。
+**CsharpSourcePaths** 指向你反编译后的 RimWorld C# 源码目录，**XmlSourcePaths** 指向 RimWorld 的 Data 目录（包含所有 XML
+定义文件）。
+上面的源码里也包含了一个示例的 `config.json` 文件，你可以根据自己的环境修改路径。
 
-## 🛡️ 安全与限制
-- **路径沙箱**：服务器仅允许访问 config.json 中明确授权的目录，保护隐私。
-- **性能防护**：内置 2MB 文件解析上限，防御超大型 XML 导致的内存溢出。
-- **静态索引**：扫描在启动时完成，若修改了源码请重启服务器以刷新数据。
 
-## 📄 开源协议
-基于 **MIT License** 开源。
+> 到目前为止，你已经准备好了 MCP 服务器的可执行文件和配置文件，接下来就是将它集成到你的 AI 助手中，让它能够调用这些工具来分析
+> RimWorld 的源码了。
+---
+
+## 5. 安装至 AI 助手
+
+创建mcp.json文件，内容如下：
+
+```json
+{
+  "mcpServers": {
+    "rimworld-searcher": {
+      "args": [
+      ],
+      "command": "Folder path to RimSearcher.Server.exe",
+      "cwd": "Folder path to RimSearcher"
+    }
+  }
+}
+```
+
+> 注意，`command` 需要指向你放置 RimSearcher.Server.exe 的完整路径，`cwd` 则是该可执行文件所在的目录。
+
+---
+
+#### 到目前为止，你已经成功安装了 RimSearcher MCP 服务器，并将其集成到了你的 AI 助手中。现在，你的助手应该能够通过 MCP 协议调用 RimSearcher 提供的工具来分析和查询 RimWorld 的源码了。
+
+### 如果这个项目对你有帮助，欢迎在 GitHub 上给我点个 Star ⭐，这将是对我最大的支持！如果你有任何问题或者建议，也欢迎在 Issues 中提出，我会尽快回复。
+
+*Powered by .NET 10 & Gemini Cli.*
