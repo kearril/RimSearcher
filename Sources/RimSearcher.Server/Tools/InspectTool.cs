@@ -16,13 +16,16 @@ public class InspectTool : ITool
         _defIndexer = defIndexer;
     }
 
-    public string Name => "inspect";
-    public string Description => "全面解析资源。若是 Def 则返回完整数值和对应 C# 类型；若是类型则返回继承图和大纲。";
+    public string Name => "rimworld-searcher__inspect";
+    public string Description => "Deeply analyzes RimWorld resources. Core features: 1. Resolves XML inheritance (ParentName) to show final merged values; 2. Extracts associated C# classes (thingClass, workerClass, etc.) from Defs; 3. Displays full inheritance chains and class outlines for C# types. PREFER this tool when analyzing the structure of a specific Def or Class.";
 
     public object JsonSchema => new {
         type = "object",
         properties = new {
-            name = new { type = "string", description = "类型名或 DefName" }
+            name = new { 
+                type = "string", 
+                description = "The exact DefName or Class name to inspect. Example: 'Apparel_ShieldBelt' or 'RimWorld.Pawn'." 
+            }
         },
         required = new[] { "name" }
     };
@@ -30,27 +33,31 @@ public class InspectTool : ITool
     public async Task<string> ExecuteAsync(JsonElement args)
     {
         var name = args.GetProperty("name").GetString();
-        if (string.IsNullOrEmpty(name)) return "名称不能为空";
+        if (string.IsNullOrEmpty(name)) return "Name cannot be empty.";
 
         var sb = new StringBuilder();
 
-        // 优先尝试作为 Def 进行解析，获取其合并后的 XML 内容。
+        // Try to resolve as a Def first to get its merged XML content.
         var def = _defIndexer.GetDef(name);
         if (def != null)
         {
-            sb.AppendLine($"## Def: {name} ({def.DefType})");
+            sb.AppendLine($"# Def Analysis: {name}");
+            sb.AppendLine($"- **Type**: {def.DefType}");
+            sb.AppendLine($"- **File**: `{def.FilePath}`");
+            
             var resolvedXmlStr = await XmlInheritanceHelper.ResolveDefXmlAsync(name, _defIndexer);
-            sb.AppendLine("### Resolved XML Content:");
+            sb.AppendLine("\n## Resolved XML (with Inheritance)");
+            sb.AppendLine("> This shows the final values after merging ParentName templates.");
             sb.AppendLine("```xml");
             sb.AppendLine(resolvedXmlStr);
             sb.AppendLine("```");
 
-            // 解析 XML 以提取关联的 C# 类型（如 thingClass, workerClass 等）。
+            // Parse XML to extract associated C# types (e.g., thingClass, workerClass, etc.).
             try
             {
                 var xdoc = XDocument.Parse(resolvedXmlStr);
                 
-                // 定义 RimWorld 核心常用的类关联标签。
+                // Define tags commonly used for class associations in RimWorld.
                 var classTags = new HashSet<string>(StringComparer.OrdinalIgnoreCase) 
                 { 
                     "thingClass", "workerClass", "jobClass", "hediffClass", "thoughtClass", 
@@ -63,20 +70,20 @@ public class InspectTool : ITool
                 var foundTypes = new HashSet<string>();
                 foreach (var el in xdoc.Descendants())
                 {
-                    // 1. 匹配已知标签。
+                    // 1. Match known tags.
                     if (classTags.Contains(el.Name.LocalName))
                     {
                         var val = el.Value.Trim();
                         if (!string.IsNullOrEmpty(val)) foundTypes.Add(val);
                     }
-                    // 2. 启发式匹配：任何以 Class 或 Worker 结尾的标签。
+                    // 2. Heuristic match: any tag ending in Class or Worker.
                     else if (el.Name.LocalName.EndsWith("Class", StringComparison.OrdinalIgnoreCase) || 
                              el.Name.LocalName.EndsWith("Worker", StringComparison.OrdinalIgnoreCase))
                     {
                         var val = el.Value.Trim();
                         if (!string.IsNullOrEmpty(val)) foundTypes.Add(val);
                     }
-                    // 3. 处理 XML 属性形式。
+                    // 3. Handle XML attribute form.
                     var classAttr = el.Attribute("Class");
                     if (classAttr != null)
                     {
@@ -86,13 +93,18 @@ public class InspectTool : ITool
 
                 if (foundTypes.Count > 0)
                 {
-                    sb.AppendLine("\n### Associated C# Types:");
+                    sb.AppendLine("\n## Associated C# Types");
+                    sb.AppendLine("> Use 'read_code' or 'trace' on these types to see their logic.");
                     foreach (var cls in foundTypes)
                     {
                         var paths = _sourceIndexer.GetPathsByType(cls);
                         if (paths.Count > 0)
                         {
-                            sb.AppendLine($"- **{cls}**: {string.Join(", ", paths)}");
+                            sb.AppendLine($"- **{cls}**: `{string.Join(", ", paths)}` - Hint: Use 'read_code' here.");
+                        }
+                        else
+                        {
+                            sb.AppendLine($"- **{cls}** (Source not found in current project)");
                         }
                     }
                 }
@@ -102,16 +114,16 @@ public class InspectTool : ITool
             return sb.ToString();
         }
 
-        // 2. 尝试作为 C# 类型解析
+        // 2. Try to resolve as a C# Type.
         var csharpPaths = _sourceIndexer.GetPathsByType(name);
         if (csharpPaths.Count > 0)
         {
-            sb.AppendLine($"## C# Type: {name}");
+            sb.AppendLine($"# C# Type Analysis: {name}");
             
             var chain = _sourceIndexer.GetInheritanceChain(name);
             if (chain.Count > 0)
             {
-                sb.AppendLine("### Inheritance Graph");
+                sb.AppendLine("\n## Inheritance Graph");
                 sb.AppendLine("```mermaid\ngraph TD");
                 foreach (var (child, parent) in chain) sb.AppendLine($"    {child} --> {parent}");
                 sb.AppendLine("```\n");
@@ -119,13 +131,14 @@ public class InspectTool : ITool
 
             foreach (var path in csharpPaths)
             {
-                sb.AppendLine($"### Outline (File: {path})");
+                sb.AppendLine($"## Outline (File: `{path}`)");
+                sb.AppendLine("> Use 'read_code' with 'methodName' to see the implementation of any method below.");
                 sb.AppendLine(await RoslynHelper.GetClassOutlineAsync(path, name));
                 sb.AppendLine("---");
             }
             return sb.ToString();
         }
 
-        return $"未找到名为 {name} 的 Def 或 C# 类型。";
+        return $"Resource '{name}' not found. Tips: 1. If you aren't sure of the exact name, use 'locate' tool first. 2. Remember that class names are case-sensitive and might require namespaces.";
     }
 }

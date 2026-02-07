@@ -3,11 +3,11 @@ using RimSearcher.Server.Tools;
 using RimSearcher.Core;
 using RimSearcher.Server;
 
-// 强制 UTF-8 编码以确保跨平台协议传输的字符稳定性。
+// Enforce UTF-8 encoding to ensure character stability for cross-platform protocol transmission.
 Console.InputEncoding = Encoding.UTF8;
 Console.OutputEncoding = Encoding.UTF8;
 
-// 劫持标准输出至标准错误，确保只有显式调用的协议流使用 STDOUT，防止协议污染。
+// Hijack standard output to standard error to ensure only explicit protocol streams use STDOUT, preventing protocol pollution.
 var protocolOut = Console.Out;
 Console.SetOut(Console.Error);
 
@@ -21,7 +21,7 @@ appConfig.XmlSourcePaths = appConfig.XmlSourcePaths.Distinct().ToList();
 
 if (appConfig.CsharpSourcePaths.Count == 0 && appConfig.XmlSourcePaths.Count == 0)
 {
-    Console.Error.WriteLine("警告: 未检测到任何源码路径配置 (config.json)。");
+    Console.Error.WriteLine("Warning: No source path configuration detected (config.json).");
 }
 
 PathSecurity.Initialize(appConfig.CsharpSourcePaths.Concat(appConfig.XmlSourcePaths));
@@ -33,7 +33,7 @@ foreach (var path in appConfig.CsharpSourcePaths)
 {
     if (Directory.Exists(path))
     {
-        Console.Error.WriteLine($"[Indexer] 正在扫描 C# 源码: {path} ...");
+        Console.Error.WriteLine($"[Indexer] Scanning C# source: {path} ...");
         indexer.Scan(path);
     }
 }
@@ -42,7 +42,7 @@ foreach (var path in appConfig.XmlSourcePaths)
 {
     if (Directory.Exists(path))
     {
-        Console.Error.WriteLine($"[Indexer] 正在扫描 Def XML: {path} ...");
+        Console.Error.WriteLine($"[Indexer] Scanning Def XML: {path} ...");
         defIndexer.Scan(path);
     }
 }
@@ -55,5 +55,6 @@ server.RegisterTool(new TraceTool(indexer));
 server.RegisterTool(new ReadCodeTool());
 server.RegisterTool(new SearchRegexTool(indexer));
 
-Console.Error.WriteLine("RimWorld MCP Server 已启动...");
+Console.Error.WriteLine("RimWorld MCP Server started...");
+
 await server.RunAsync();

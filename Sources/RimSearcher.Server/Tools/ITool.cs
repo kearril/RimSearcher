@@ -5,29 +5,108 @@ namespace RimSearcher.Server.Tools;
 
 
 /// <summary>
-/// 定义 MCP 服务器工具的通用接口。
+
+
+
+/// Defines a common interface for MCP server tools.
+
+
+
 /// </summary>
+
+
+
 public interface ITool
+
+
+
 {
-    /// <summary>
-    /// 工具的名称。
-    /// </summary>
-    string Name { get; }
-    
-    /// <summary>
-    /// 工具的功能描述。
-    /// </summary>
-    string Description { get; }
+
+
 
     /// <summary>
-    /// 工具接收参数的 JSON Schema 定义。
+
+
+
+    /// The name of the tool.
+
+
+
     /// </summary>
-    object JsonSchema { get; }
-    
+
+
+
+    string Name { get; }
+
+
+
+
+
+
+
     /// <summary>
-    /// 执行工具的核心逻辑。
+
+
+
+    /// Functional description of the tool.
+
+
+
     /// </summary>
-    /// <param name="arguments">由 MCP 客户端传递的 JSON 参数。</param>
-    /// <returns>执行结果的字符串表示。</returns>
+
+
+
+    string Description { get; }
+
+
+
+
+
+
+
+    /// <summary>
+
+
+
+    /// JSON Schema definition for the tool's input parameters.
+
+
+
+    /// </summary>
+
+
+
+    object JsonSchema { get; }
+
+
+
+
+
+
+
+    /// <summary>
+
+
+
+    /// Executes the core logic of the tool.
+
+
+
+    /// </summary>
+
+
+
+    /// <param name="arguments">JSON parameters passed by the MCP client.</param>
+
+
+
+    /// <returns>A string representation of the execution result.</returns>
+
+
+
     Task<string> ExecuteAsync(JsonElement arguments);
+
+
+
 }
+

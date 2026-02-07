@@ -13,16 +13,23 @@ public class TraceTool : ITool
         _sourceIndexer = sourceIndexer;
     }
 
-    public string Name => "trace";
-    public string Description => "追踪关联关系。支持寻找子类 (inheritors) 或查找符号引用 (usages)。";
+    public string Name => "rimworld-searcher__trace";
+    public string Description => "Traces code relationships. 1. 'inheritors' mode: Finds all subclasses of a specified type (downstream inheritance); 2. 'usages' mode: Searches for text references of a symbol across C# and XML files (upstream usage). Useful for impact analysis or finding extension points.";
 
     public object JsonSchema => new
     {
         type = "object",
         properties = new
         {
-            symbol = new { type = "string", description = "要追踪的类型名或方法名" },
-            mode = new { type = "string", @enum = new[] { "inheritors", "usages" }, description = "追踪模式" }
+            symbol = new { 
+                type = "string", 
+                description = "The Class name, Method name, or any string symbol to trace. Example: 'Pawn' or 'TakeDamage'." 
+            },
+            mode = new { 
+                type = "string", 
+                @enum = new[] { "inheritors", "usages" }, 
+                description = "'inheritors': Find subclasses of the symbol. 'usages': Find text references of the symbol in the codebase." 
+            }
         },
         required = new[] { "symbol", "mode" }
     };
@@ -32,22 +39,22 @@ public class TraceTool : ITool
         var symbol = args.GetProperty("symbol").GetString();
         var mode = args.GetProperty("mode").GetString();
 
-        if (string.IsNullOrEmpty(symbol)) return "Symbol 不能为空";
+        if (string.IsNullOrEmpty(symbol)) return "Symbol cannot be empty.";
 
         if (mode == "inheritors")
         {
             var inheritors = _sourceIndexer.GetInheritors(symbol);
-            if (inheritors.Count == 0) return $"未找到 {symbol} 的子类。";
+            if (inheritors.Count == 0) return $"No subclasses found for {symbol}.";
 
             var results = inheritors.Select(name => 
             {
                 var paths = _sourceIndexer.GetPathsByType(name);
-                return $"{name} (in {string.Join(", ", paths)})";
+                return $"{name} (in `{string.Join(", ", paths)}`)";
             });
 
             return string.Join(Environment.NewLine, results);
         }
-        else // usages 模式：在全域范围内查找该符号的文本引用。
+        else // usages mode: search for text references globally.
         {
             var results = new ConcurrentBag<string>();
             var files = _sourceIndexer.GetAllFiles()
@@ -83,12 +90,12 @@ public class TraceTool : ITool
                 catch { }
             });
             
-            if (results.Count == 0) return "未找到任何引用。";
+            if (results.Count == 0) return "No references found.";
 
-            var output = string.Join(Environment.NewLine, results.Take(50));
+            var output = string.Join(Environment.NewLine, results.Take(50).Select(r => $"- `{r}`"));
             if (truncated || globalCount >= 50)
             {
-                output += "\n\n--- ⚠️ 注意：引用结果较多，已截断显示前 50 条。 ---";
+                output += "\n\n--- ⚠️ WARNING: Too many results, truncated to first 50. ---";
             }
             return output;
         }

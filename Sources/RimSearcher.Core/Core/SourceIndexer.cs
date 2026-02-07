@@ -18,11 +18,11 @@ public class SourceIndexer
         if (!Directory.Exists(rootPath)) return;
         var blacklistedDirs = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "bin", "obj", ".git", ".vs", ".idea", ".build", "temp" };
         
-        // 使用迭代式文件扫描替代递归，以规避在极深目录结构下可能发生的栈溢出。
+        // Use iterative file scanning instead of recursion to avoid potential stack overflow in deeply nested structures.
         var allFiles = CollectFilesIterative(rootPath, blacklistedDirs);
         var newFiles = allFiles.Where(f => _processedFiles.TryAdd(Path.GetFullPath(f), 0)).ToList();
 
-        // 并行处理源码解析，加快大规模项目的索引速度。
+        // Parallel processing of source code parsing to speed up indexing for large projects.
         Parallel.ForEach(newFiles, file =>
         {
             var fileName = Path.GetFileNameWithoutExtension(file);

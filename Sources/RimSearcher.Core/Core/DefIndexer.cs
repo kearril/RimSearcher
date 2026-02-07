@@ -46,7 +46,7 @@ public class DefIndexer
         {
             try
             {
-                // 限制解析文件的大小，防止在读取异常巨大的 XML 文件时发生内存溢出 (OOM)。
+                // Limit file size to prevent memory overflow (OOM) when reading unusually large XML files.
                 if (new FileInfo(file).Length > 2 * 1024 * 1024) return;
 
                 using var stream = new FileStream(file, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
@@ -80,7 +80,7 @@ public class DefIndexer
             catch { }
         });
 
-        Console.Error.WriteLine($"[DefIndexer] 扫描完成。成功解析: {totalParsed}");
+        Console.Error.WriteLine($"[DefIndexer] Scanning complete. Successfully parsed: {totalParsed}");
     }
 
     public List<DefLocation> Search(string query)

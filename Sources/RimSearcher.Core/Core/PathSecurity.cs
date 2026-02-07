@@ -12,7 +12,7 @@ public static class PathSecurity
         {
             if (string.IsNullOrEmpty(path)) continue;
             
-            // 规范化路径并移除尾部斜杠，确保前缀匹配逻辑的准确性。
+            // Normalize the path and remove trailing slashes to ensure accurate prefix matching.
             var fullPath = Path.GetFullPath(path).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
             if (!AllowedRoots.Contains(fullPath, StringComparer.OrdinalIgnoreCase))
             {
@@ -31,10 +31,10 @@ public static class PathSecurity
             
             return AllowedRoots.Any(root => 
             {
-                // 1. 完全匹配
+                // 1. Exact match
                 if (fullPath.Equals(root, StringComparison.OrdinalIgnoreCase)) return true;
                 
-                // 2. 属于子目录 (确保 D:\Source 不会匹配 D:\SourceCode)
+                // 2. Subdirectory match (ensure D:\Source doesn't match D:\SourceCode)
                 var rootWithSlash = root + Path.DirectorySeparatorChar;
                 if (fullPath.StartsWith(rootWithSlash, StringComparison.OrdinalIgnoreCase)) return true;
                 
@@ -53,6 +53,6 @@ public static class PathSecurity
     public static string ValidateAndGetPath(string requestedPath)
     {
         if (IsPathSafe(requestedPath)) return requestedPath;
-        throw new UnauthorizedAccessException($"拒绝访问：路径 {requestedPath} 不在允许的源码范围内。");
+        throw new UnauthorizedAccessException($"Access Denied: Path {requestedPath} is not within the allowed source directories.");
     }
 }

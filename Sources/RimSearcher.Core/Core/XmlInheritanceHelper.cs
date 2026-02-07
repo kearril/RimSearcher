@@ -5,7 +5,7 @@ namespace RimSearcher.Core;
 
 public static class XmlInheritanceHelper
 {
-    // 配置 XML 读取器以禁止 DTD 处理，防御潜在线性解析攻击（如 XXE）。
+    // Configure XML reader settings to prohibit DTD processing, defending against potential XXE attacks.
     private static readonly XmlReaderSettings SafeSettings = new() { DtdProcessing = DtdProcessing.Prohibit };
 
     public static async Task<string> ResolveDefXmlAsync(string defName, DefIndexer indexer)

@@ -53,10 +53,10 @@ public static class RoslynHelper
 
     public static async Task<string> GetClassOutlineAsync(string filePath, string? targetTypeName = null)
     {
-        if (!File.Exists(filePath)) return "文件不存在";
+        if (!File.Exists(filePath)) return "File not found.";
         
-        // 限制处理文件的大小，防止在解析极大型源码文件时消耗过量内存。
-        if (new FileInfo(filePath).Length > MaxFileSize) return $"文件过大 (超过 2MB)，已跳过解析。";
+        // Limit file size to prevent excessive memory usage during parsing.
+        if (new FileInfo(filePath).Length > MaxFileSize) return "File too large (over 2MB), skipping parsing.";
         
         string code;
         using (var stream = new FileStream(filePath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite))
@@ -104,13 +104,13 @@ public static class RoslynHelper
             sb.AppendLine();
         }
 
-        return sb.Length > 0 ? sb.ToString() : (targetTypeName != null ? $"在文件中未找到类型: {targetTypeName}" : "文件中未找到任何类型定义。");
+        return sb.Length > 0 ? sb.ToString() : (targetTypeName != null ? $"Type not found in file: {targetTypeName}" : "No type definitions found in file.");
     }
 
     public static async Task<string> GetMethodBodyAsync(string filePath, string methodName, string? typeName = null)
     {
-        if (!File.Exists(filePath)) return "文件不存在";
-        if (new FileInfo(filePath).Length > MaxFileSize) return $"文件过大 (超过 2MB)，已跳过读取。";
+        if (!File.Exists(filePath)) return "File not found.";
+        if (new FileInfo(filePath).Length > MaxFileSize) return "File too large (over 2MB), skipping parsing.";
         
         string code;
         using (var stream = new FileStream(filePath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite))
@@ -123,7 +123,7 @@ public static class RoslynHelper
         var root = await tree.GetRootAsync();
 
         var methods = root.DescendantNodes().OfType<MethodDeclarationSyntax>();
-        var matches = methods.Where(m => m.Identifier.Text.Equals(methodName, StringComparison.OrdinalIgnoreCase));
+        var matches = methods.Where(m => m.Identifier.Text.Equals(methodName, StringComparison.OrdinalIgnoreCase)).ToList();
         
         if (!string.IsNullOrEmpty(typeName))
         {
@@ -134,29 +134,40 @@ public static class RoslynHelper
                     parentType.Identifier.Text.Equals(typeName, StringComparison.OrdinalIgnoreCase) ||
                     GetFullTypeName(parentType).Equals(typeName, StringComparison.OrdinalIgnoreCase)
                 );
-            });
+            }).ToList();
         }
 
-        var resultList = matches.ToList();
-        if (resultList.Count == 0) return $"未找到方法: {(string.IsNullOrEmpty(typeName) ? "" : typeName + ".")}{methodName}";
-        
-        if (resultList.Count == 1)
+        if (matches.Count == 0) 
         {
-            var m = resultList[0];
+            var availableMethods = methods.Select(m => m.Identifier.Text).Distinct().OrderBy(n => n).ToList();
+            var sbErr = new StringBuilder();
+            sbErr.AppendLine($"Method '{methodName}' not found.");
+            if (availableMethods.Count > 0)
+            {
+                sbErr.AppendLine("\nAvailable methods in this file:");
+                foreach (var mName in availableMethods) sbErr.AppendLine($"- {mName}");
+                sbErr.AppendLine("\nHint: Choose one of the method names above and call 'read_code' again.");
+            }
+            return sbErr.ToString();
+        }
+        
+        if (matches.Count == 1)
+        {
+            var m = matches[0];
             var lineSpan = m.GetLocation().GetLineSpan();
             return $"// File: {filePath}\n// Starts at line: {lineSpan.StartLinePosition.Line + 1}\n{m.ToFullString()}";
         }
 
         var sb = new StringBuilder();
-        sb.AppendLine($"/* 发现 {resultList.Count} 个匹配的方法重载或冲突 */");
-        foreach (var m in resultList)
+        sb.AppendLine($"/* Found {matches.Count} matching method overloads or conflicts */");
+        foreach (var m in matches)
         {
             var lineSpan = m.GetLocation().GetLineSpan();
             var parentType = m.Ancestors().OfType<TypeDeclarationSyntax>().FirstOrDefault();
             sb.AppendLine($"// Type: {(parentType != null ? GetFullTypeName(parentType) : "Unknown")}");
             sb.AppendLine($"// Starts at line: {lineSpan.StartLinePosition.Line + 1}");
             sb.AppendLine(m.ToFullString());
-            sb.AppendLine("\n// --- 下一个匹配 ---\n");
+            sb.AppendLine("\n// --- NEXT MATCH ---\n");
         }
         return sb.ToString();
     }

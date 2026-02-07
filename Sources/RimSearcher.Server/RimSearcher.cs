@@ -9,7 +9,7 @@ public sealed class RimSearcher
     private readonly SemaphoreSlim _writeLock = new(1, 1);
     private readonly TextWriter _protocolOut;
     
-    // 限制最大并发处理数，平衡响应速度与系统资源消耗。
+    // Limit max concurrency to balance response speed and system resource consumption.
     private readonly SemaphoreSlim _concurrencyLimit = new(10, 10);
 
     public RimSearcher(TextWriter? protocolOut = null)
@@ -79,12 +79,16 @@ public sealed class RimSearcher
                 {
                     protocolVersion = "2024-11-05",
                     capabilities = new { tools = new { } },
-                    serverInfo = new { name = "RimWorld Source MCP Server", version = "0.1.0" }
+                    serverInfo = new { 
+                        name = "RimWorld-Expert-Source-Analyzer", 
+                        version = "1.1",
+                        description = "Specialized MCP server for deep RimWorld source code and XML Def analysis."
+                    }
                 });
             }
             else if (method == "notifications/initialized")
             {
-                await Console.Error.WriteLineAsync("MCP 握手完成。");
+                await Console.Error.WriteLineAsync("MCP handshake complete.");
             }
             else if (method == "list_tools" || method == "tools/list")
             {
@@ -136,7 +140,7 @@ public sealed class RimSearcher
         await _writeLock.WaitAsync();
         try
         {
-            // 异步写入并强制刷新，确保 JSON-RPC 消息即时送达。
+            // Async write and flush to ensure JSON-RPC messages are delivered immediately.
             await _protocolOut.WriteLineAsync(json);
             await _protocolOut.FlushAsync();
         }

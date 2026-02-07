@@ -5,17 +5,29 @@ namespace RimSearcher.Server.Tools;
 
 public class ReadCodeTool : ITool
 {
-    public string Name => "read_code";
-    public string Description => "读取源码。支持读取整个方法或指定行范围（分页）。";
+    public string Name => "rimworld-searcher__read_code";
+    public string Description => "Smartly reads source code. 1. (Recommended) Extract the complete implementation of a method by providing 'methodName'; 2. Alternatively, read by line range (pagination). Prefer this tool when you need to understand the logic of a specific class member.";
 
     public object JsonSchema => new {
         type = "object",
         properties = new {
-            path = new { type = "string", description = "文件路径" },
-            methodName = new { type = "string", description = "可选：要读取的具体方法名" },
-            className = new { type = "string", description = "可选：当方法名有冲突时指定类名" },
-            startLine = new { type = "integer", description = "可选：起始行 (从 0 开始)" },
-            lineCount = new { type = "integer", description = "可选：读取行数 (默认 100)" }
+            path = new { type = "string", description = "Absolute file path." },
+            methodName = new { 
+                type = "string", 
+                description = "(Highly Recommended) The name of the method to extract. Using this avoids manual line counting. Example: 'DoEffect' or 'Tick'." 
+            },
+            className = new { 
+                type = "string", 
+                description = "Optional: The class name to resolve ambiguity if multiple classes in the file have the same method name." 
+            },
+            startLine = new { 
+                type = "integer", 
+                description = "Optional: Starting line number (0-based). Used only if methodName is not provided." 
+            },
+            lineCount = new { 
+                type = "integer", 
+                description = "Optional: Number of lines to read. Defaults to 100." 
+            }
         },
         required = new[] { "path" }
     };
@@ -23,23 +35,28 @@ public class ReadCodeTool : ITool
     public async Task<string> ExecuteAsync(JsonElement args)
     {
         var path = args.GetProperty("path").GetString();
-        if (string.IsNullOrEmpty(path)) return "路径不能为空";
+        if (string.IsNullOrEmpty(path)) return "Path cannot be empty.";
 
-        if (!PathSecurity.IsPathSafe(path)) return "访问被拒绝：路径超出允许范围。";
-        if (!File.Exists(path)) return "文件不存在";
+        if (!PathSecurity.IsPathSafe(path)) return "Access Denied: Path is outside allowed source directories.";
+        if (!File.Exists(path)) return "File does not exist.";
 
-        // 尝试按方法名检索，如果提供了 methodName 则使用 Roslyn 解析。
+        // Try to retrieve by method name; use Roslyn for parsing if methodName is provided.
         if (args.TryGetProperty("methodName", out var mProp))
         {
             var methodName = mProp.GetString();
             if (!string.IsNullOrEmpty(methodName))
             {
                 var className = args.TryGetProperty("className", out var cProp) ? cProp.GetString() : null;
-                return await RoslynHelper.GetMethodBodyAsync(path, methodName, className);
+                var body = await RoslynHelper.GetMethodBodyAsync(path, methodName, className);
+                if (string.IsNullOrEmpty(body) || body.Contains("Method not found"))
+                {
+                    return $"Method '{methodName}' not found in {path}. Tips: 1. Ensure the method name is correct (case-sensitive); 2. Use 'inspect' tool on the class to see all available methods.";
+                }
+                return $"# Method: {methodName}\n```csharp\n{body}\n```";
             }
         }
 
-        // 回退到基于行号的分页读取模式。
+        // Fallback to line-based paginated reading mode.
         int startLine = args.TryGetProperty("startLine", out var sProp) ? sProp.GetInt32() : 0;
         int lineCount = args.TryGetProperty("lineCount", out var lProp) ? lProp.GetInt32() : 100;
 
@@ -48,7 +65,7 @@ public class ReadCodeTool : ITool
             var resultLines = new List<string>();
             int currentLine = 0;
             
-            // 使用流式读取，并为每一行添加行号标识。
+            // Use streaming read and add line numbers for identification.
             foreach (var line in File.ReadLines(path))
             {
                 if (currentLine >= startLine && currentLine < startLine + lineCount)
@@ -59,13 +76,13 @@ public class ReadCodeTool : ITool
                 if (currentLine >= startLine + lineCount) break;
             }
 
-            if (resultLines.Count == 0) return $"行范围 {startLine}-{startLine + lineCount} 超出文件长度。";
+            if (resultLines.Count == 0) return $"Line range {startLine}-{startLine + lineCount} exceeds file length.";
             
             return string.Join("\n", resultLines);
         }
         catch (Exception ex)
         {
-            return $"读取失败: {ex.Message}";
+            return $"Read failed: {ex.Message}";
         }
     }
 }

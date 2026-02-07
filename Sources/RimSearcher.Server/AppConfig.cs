@@ -3,7 +3,7 @@ using System.Text.Json;
 namespace RimSearcher.Server;
 
 /// <summary>
-/// 存储服务器的全局配置信息，包括 C# 和 XML 源码的扫描路径。
+/// Stores global configuration information for the server, including scan paths for C# and XML source.
 /// </summary>
 public class AppConfig
 {
@@ -11,7 +11,7 @@ public class AppConfig
     public List<string> XmlSourcePaths { get; set; } = new();
 
     /// <summary>
-    /// 从指定的 JSON 文件加载配置。
+    /// Loads configuration from a specified JSON file.
     /// </summary>
     public static AppConfig Load(string path)
     {
@@ -23,7 +23,7 @@ public class AppConfig
         }
         catch (Exception ex)
         {
-            Console.Error.WriteLine($"[Config] 加载配置文件失败: {ex.Message}");
+            Console.Error.WriteLine($"[Config] Failed to load config file: {ex.Message}");
             return new AppConfig();
         }
     }
