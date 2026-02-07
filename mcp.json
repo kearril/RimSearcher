@@ -3,8 +3,8 @@
     "rimworld-searcher": {
       "args": [
       ],
-      "command": "D:/vs代码/Git/RimSearcher/Sources/Publish/RimSearcher.Server.exe",
-      "cwd": "D:/vs代码/Git/RimSearcher/Sources/Publish"
+      "command": "Folder path to RimSearcher.Server.exe",
+      "cwd": "Folder path to RimSearcher"
     }
   }
 }
