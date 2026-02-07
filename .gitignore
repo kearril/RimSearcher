@@ -1,0 +1,26 @@
+﻿# .gitignore for RimSearcher
+
+# Build artifacts
+.build/
+Publish/
+bin/
+obj/
+
+# IDE settings
+.idea/
+.vs/
+*.user
+*.userosscache
+*.sln.docstates
+
+# NuGet
+packages/
+*.nuget.props
+*.nuget.targets
+
+# OS generated files
+.DS_Store
+Thumbs.db
+
+# MCP project specific logs or temp files
+*.log

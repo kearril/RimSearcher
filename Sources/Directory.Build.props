@@ -1,0 +1,9 @@
+<Project>
+  <PropertyGroup>
+    <!-- 全局重定向所有构建产物到根目录下的 .build 文件夹 -->
+    <!-- 使用 MSBuildThisFileDirectory 确保路径相对于此文件（即解决方案根目录） -->
+    <BaseOutputPath>$(MSBuildThisFileDirectory).build\bin\$(MSBuildProjectName)\</BaseOutputPath>
+    <BaseIntermediateOutputPath>$(MSBuildThisFileDirectory).build\obj\$(MSBuildProjectName)\</BaseIntermediateOutputPath>
+    <MSBuildProjectExtensionsPath>$(BaseIntermediateOutputPath)</MSBuildProjectExtensionsPath>
+  </PropertyGroup>
+</Project>

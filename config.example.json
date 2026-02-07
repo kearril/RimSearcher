@@ -1,0 +1,8 @@
+﻿{
+  "CsharpSourcePaths": [
+    "C:/Path/To/Your/RimWorld/Source"
+  ],
+  "XmlSourcePaths": [
+    "C:/SteamLibrary/steamapps/common/RimWorld/Data"
+  ]
+}

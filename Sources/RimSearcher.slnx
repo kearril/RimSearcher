@@ -1,0 +1,4 @@
+<Solution>
+  <Project Path="RimSearcher.Core/RimSearcher.Core.csproj" />
+  <Project Path="RimSearcher.Server/RimSearcher.Server.csproj" />
+</Solution>
