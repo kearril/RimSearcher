@@ -1,7 +1,9 @@
-﻿# RimSearcher: RimWorld 源码分析 MCP 服务器
+﻿# RimSearcher: RimWorld 源码搜索 MCP 服务器
 
 RimSearcher 是一个基于 Model Context Protocol (MCP) 实现的专用服务器，旨在为 AI 助手（如 Gemini, Claude 等）提供对 RimWorld
 游戏源码（C#）和配置文件（XML）的高效检索与深度分析能力。
+
+使用C# 14 和 .NET 10 开发，RimSearcher 利用 Roslyn 编译器平台实现了对 C# 代码的智能解析和方法体提取，同时支持 RimWorld 特有的 XML 定义解析逻辑。
 
 本项目使用了Gemini辅助完成.
 
@@ -15,13 +17,13 @@ RimSearcher 是一个基于 Model Context Protocol (MCP) 实现的专用服务�
     * **分页机制**：源码读取支持行范围限制，防止上下文溢出。
 * **智能 XML 解析**：支持 RimWorld 特有的 XML 继承逻辑（Abstract/ParentName），能够返回解析后的最终属性。
 * **协议标准**：遵循 JSON-RPC 2.0 规范，通过标准输入输出（Stdio）与客户端通信，具有良好的兼容性。
-* **项目已完整打包**：提供了编译好的单文件可执行程序，用户只需安装 .net 10 CKD即可使用。
+* **项目已完整打包**：提供了编译好的单文件可执行程序，用户只需安装 .net 10 CDK即可使用。
 
 ---
 
 ## 2. 工具能力
 
-RimSearcher 暴露了以下核心工具供 AI 调用：
+RimSearcher 暴露了以下6个强大的核心工具供 AI 调用：
 
 * **locate**: 快速定位。通过名称查找特定的 ThingDef 或 C# 类型定义。
 * **inspect**: 深度查看。获取完整的 XML 定义（含继承解析）或 C# 类的成员结构。
