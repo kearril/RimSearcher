@@ -6,41 +6,53 @@ namespace RimSearcher.Server.Tools;
 public class ReadCodeTool : ITool
 {
     public string Name => "rimworld-searcher__read_code";
-    public string Description => "Smartly reads source code. 1. (Recommended) Extract the complete implementation of a method by providing 'methodName'; 2. Alternatively, read by line range (pagination). Prefer this tool when you need to understand the logic of a specific class member.";
 
-    public object JsonSchema => new {
+    public string Description =>
+        "Precision extraction of RimWorld's C# logic. Highly recommended: provide a `methodName` to isolate and retrieve only the relevant implementation block, bypassing thousands of lines of boilerplate. Use this to understand the actual execution logic of Comps, Workers, and Ticks.";
+
+    public string? Icon => "lucide:file-code";
+
+    public object JsonSchema => new
+    {
         type = "object",
-        properties = new {
-            path = new { type = "string", description = "Absolute file path." },
-            methodName = new { 
-                type = "string", 
-                description = "(Highly Recommended) The name of the method to extract. Using this avoids manual line counting. Example: 'DoEffect' or 'Tick'." 
+        properties = new
+        {
+            path = new { type = "string", description = "Absolute file path (found via 'locate'). Example: '/path/to/RimWorld/Source/CompShield.cs'" },
+            methodName = new
+            {
+                type = "string",
+                description =
+                    "The specific method implementation to read. Example: 'CompTick' or 'DoEffect'."
             },
-            className = new { 
-                type = "string", 
-                description = "Optional: The class name to resolve ambiguity if multiple classes in the file have the same method name." 
+            className = new
+            {
+                type = "string",
+                description = "Optional: The class name to resolve ambiguity if multiple classes in the file have the same method name."
             },
-            startLine = new { 
-                type = "integer", 
-                description = "Optional: Starting line number (0-based). Used only if methodName is not provided." 
+            startLine = new
+            {
+                type = "integer",
+                description = "Optional: Starting line number (0-based). Used only if methodName is not provided."
             },
-            lineCount = new { 
-                type = "integer", 
-                description = "Optional: Number of lines to read. Defaults to 100." 
+            lineCount = new
+            {
+                type = "integer",
+                description = "Optional: Number of lines to read. Defaults to 100."
             }
         },
         required = new[] { "path" }
     };
 
-    public async Task<string> ExecuteAsync(JsonElement args)
+    public async Task<ToolResult> ExecuteAsync(JsonElement args, CancellationToken cancellationToken, IProgress<double>? progress = null)
     {
         var path = args.GetProperty("path").GetString();
-        if (string.IsNullOrEmpty(path)) return "Path cannot be empty.";
+        if (string.IsNullOrEmpty(path)) return new ToolResult("Path cannot be empty.", true);
 
-        if (!PathSecurity.IsPathSafe(path)) return "Access Denied: Path is outside allowed source directories.";
-        if (!File.Exists(path)) return "File does not exist.";
+        if (!PathSecurity.IsPathSafe(path))
+            return new ToolResult("Access Denied: Path is outside allowed source directories.", true);
+        if (!File.Exists(path)) return new ToolResult("File does not exist.", true);
 
-        // Try to retrieve by method name; use Roslyn for parsing if methodName is provided.
+        cancellationToken.ThrowIfCancellationRequested();
         if (args.TryGetProperty("methodName", out var mProp))
         {
             var methodName = mProp.GetString();
@@ -50,9 +62,12 @@ public class ReadCodeTool : ITool
                 var body = await RoslynHelper.GetMethodBodyAsync(path, methodName, className);
                 if (string.IsNullOrEmpty(body) || body.Contains("Method not found"))
                 {
-                    return $"Method '{methodName}' not found in {path}. Tips: 1. Ensure the method name is correct (case-sensitive); 2. Use 'inspect' tool on the class to see all available methods.";
+                    return new ToolResult(
+                        $"Method '{methodName}' not found in {path}. Tips: 1. Ensure the name is correct; 2. Use 'inspect' tool on the class to see all available methods.",
+                        true);
                 }
-                return $"# Method: {methodName}\n```csharp\n{body}\n```";
+
+                return new ToolResult($"# Method: {methodName}\n```csharp\n{body}\n```");
             }
         }
 
@@ -60,29 +75,31 @@ public class ReadCodeTool : ITool
         int startLine = args.TryGetProperty("startLine", out var sProp) ? sProp.GetInt32() : 0;
         int lineCount = args.TryGetProperty("lineCount", out var lProp) ? lProp.GetInt32() : 100;
 
-        try 
+        try
         {
             var resultLines = new List<string>();
             int currentLine = 0;
-            
-            // Use streaming read and add line numbers for identification.
+
             foreach (var line in File.ReadLines(path))
             {
+                cancellationToken.ThrowIfCancellationRequested();
                 if (currentLine >= startLine && currentLine < startLine + lineCount)
                 {
                     resultLines.Add($"L{currentLine + 1}: {line}");
                 }
+
                 currentLine++;
                 if (currentLine >= startLine + lineCount) break;
             }
 
-            if (resultLines.Count == 0) return $"Line range {startLine}-{startLine + lineCount} exceeds file length.";
-            
-            return string.Join("\n", resultLines);
+            if (resultLines.Count == 0)
+                return new ToolResult($"Line range {startLine}-{startLine + lineCount} exceeds file length.", true);
+
+            return new ToolResult(string.Join("\n", resultLines));
         }
         catch (Exception ex)
         {
-            return $"Read failed: {ex.Message}";
+            return new ToolResult($"Read failed: {ex.Message}", true);
         }
     }
 }

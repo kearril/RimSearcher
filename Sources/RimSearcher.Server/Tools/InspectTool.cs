@@ -17,23 +17,32 @@ public class InspectTool : ITool
     }
 
     public string Name => "rimworld-searcher__inspect";
-    public string Description => "Deeply analyzes RimWorld resources. Core features: 1. Resolves XML inheritance (ParentName) to show final merged values; 2. Extracts associated C# classes (thingClass, workerClass, etc.) from Defs; 3. Displays full inheritance chains and class outlines for C# types. PREFER this tool when analyzing the structure of a specific Def or Class.";
 
-    public object JsonSchema => new {
+    public string Description =>
+        "The ultimate analyzer for RimWorld's complex data-code links. Crucial for XML analysis as it automatically resolves `ParentName` inheritance—a process the AI model's internal knowledge cannot accurately perform. It exposes final merged values and identifies the exact C# Worker/Comp classes bound to a Def. Also provides C# class outlines and inheritance graphs.";
+
+    public string? Icon => "lucide:eye";
+
+    public object JsonSchema => new
+    {
         type = "object",
-        properties = new {
-            name = new { 
-                type = "string", 
-                description = "The exact DefName or Class name to inspect. Example: 'Apparel_ShieldBelt' or 'RimWorld.Pawn'." 
+        properties = new
+        {
+            name = new
+            {
+                type = "string",
+                description = "The exact DefName or Class name to inspect. Example: 'Apparel_ShieldBelt' or 'RimWorld.Pawn'."
             }
         },
         required = new[] { "name" }
     };
 
-    public async Task<string> ExecuteAsync(JsonElement args)
+    public async Task<ToolResult> ExecuteAsync(JsonElement args, CancellationToken cancellationToken, IProgress<double>? progress = null)
     {
         var name = args.GetProperty("name").GetString();
-        if (string.IsNullOrEmpty(name)) return "Name cannot be empty.";
+        if (string.IsNullOrEmpty(name)) return new ToolResult("Name cannot be empty.", true);
+
+        cancellationToken.ThrowIfCancellationRequested();
 
         var sb = new StringBuilder();
 
@@ -44,7 +53,7 @@ public class InspectTool : ITool
             sb.AppendLine($"# Def Analysis: {name}");
             sb.AppendLine($"- **Type**: {def.DefType}");
             sb.AppendLine($"- **File**: `{def.FilePath}`");
-            
+
             var resolvedXmlStr = await XmlInheritanceHelper.ResolveDefXmlAsync(name, _defIndexer);
             sb.AppendLine("\n## Resolved XML (with Inheritance)");
             sb.AppendLine("> This shows the final values after merging ParentName templates.");
@@ -52,38 +61,37 @@ public class InspectTool : ITool
             sb.AppendLine(resolvedXmlStr);
             sb.AppendLine("```");
 
-            // Parse XML to extract associated C# types (e.g., thingClass, workerClass, etc.).
+            // Parse XML to extract associated C# types
             try
             {
                 var xdoc = XDocument.Parse(resolvedXmlStr);
-                
-                // Define tags commonly used for class associations in RimWorld.
-                var classTags = new HashSet<string>(StringComparer.OrdinalIgnoreCase) 
-                { 
-                    "thingClass", "workerClass", "jobClass", "hediffClass", "thoughtClass", 
+                var classTags = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+                {
+                    "thingClass", "workerClass", "jobClass", "hediffClass", "thoughtClass",
                     "compClass", "incidentClass", "interactionWorkerClass", "mentalStateHandlerClass",
                     "ritualBehaviorClass", "skillGiverClass", "worldObjectClass", "lifeStageWorkerClass",
                     "terrainDef", "traitWorkerClass", "selectionWorkerClass", "modExtension", "giverClass",
-                    "pathFilters", "soundClass", "damageWorkerClass", "linkDrawerClass"
+                    "pathFilters", "soundClass", "damageWorkerClass", "linkDrawerClass",
+                    "graphicClass", "blueprintClass", "scattererClass", "questClass", "verbClass",
+                    "roomRoleWorker", "statWorker", "moteClass"
                 };
-                
+
                 var foundTypes = new HashSet<string>();
                 foreach (var el in xdoc.Descendants())
                 {
-                    // 1. Match known tags.
+                    cancellationToken.ThrowIfCancellationRequested();
                     if (classTags.Contains(el.Name.LocalName))
                     {
                         var val = el.Value.Trim();
                         if (!string.IsNullOrEmpty(val)) foundTypes.Add(val);
                     }
-                    // 2. Heuristic match: any tag ending in Class or Worker.
-                    else if (el.Name.LocalName.EndsWith("Class", StringComparison.OrdinalIgnoreCase) || 
+                    else if (el.Name.LocalName.EndsWith("Class", StringComparison.OrdinalIgnoreCase) ||
                              el.Name.LocalName.EndsWith("Worker", StringComparison.OrdinalIgnoreCase))
                     {
                         var val = el.Value.Trim();
                         if (!string.IsNullOrEmpty(val)) foundTypes.Add(val);
                     }
-                    // 3. Handle XML attribute form.
+
                     var classAttr = el.Attribute("Class");
                     if (classAttr != null)
                     {
@@ -94,24 +102,21 @@ public class InspectTool : ITool
                 if (foundTypes.Count > 0)
                 {
                     sb.AppendLine("\n## Associated C# Types");
-                    sb.AppendLine("> Use 'read_code' or 'trace' on these types to see their logic.");
                     foreach (var cls in foundTypes)
                     {
                         var paths = _sourceIndexer.GetPathsByType(cls);
                         if (paths.Count > 0)
-                        {
                             sb.AppendLine($"- **{cls}**: `{string.Join(", ", paths)}` - Hint: Use 'read_code' here.");
-                        }
                         else
-                        {
                             sb.AppendLine($"- **{cls}** (Source not found in current project)");
-                        }
                     }
                 }
             }
-            catch { }
+            catch
+            {
+            }
 
-            return sb.ToString();
+            return new ToolResult(sb.ToString());
         }
 
         // 2. Try to resolve as a C# Type.
@@ -119,7 +124,7 @@ public class InspectTool : ITool
         if (csharpPaths.Count > 0)
         {
             sb.AppendLine($"# C# Type Analysis: {name}");
-            
+
             var chain = _sourceIndexer.GetInheritanceChain(name);
             if (chain.Count > 0)
             {
@@ -131,14 +136,17 @@ public class InspectTool : ITool
 
             foreach (var path in csharpPaths)
             {
+                cancellationToken.ThrowIfCancellationRequested();
                 sb.AppendLine($"## Outline (File: `{path}`)");
-                sb.AppendLine("> Use 'read_code' with 'methodName' to see the implementation of any method below.");
                 sb.AppendLine(await RoslynHelper.GetClassOutlineAsync(path, name));
                 sb.AppendLine("---");
             }
-            return sb.ToString();
+
+            return new ToolResult(sb.ToString());
         }
 
-        return $"Resource '{name}' not found. Tips: 1. If you aren't sure of the exact name, use 'locate' tool first. 2. Remember that class names are case-sensitive and might require namespaces.";
+        return new ToolResult(
+            $"Resource '{name}' not found. Tips: 1. If you aren't sure of the exact name, use 'locate' tool first. 2. Remember that class names are case-sensitive.",
+            true);
     }
 }

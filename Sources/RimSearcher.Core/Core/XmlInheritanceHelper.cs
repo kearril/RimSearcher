@@ -20,15 +20,16 @@ public static class XmlInheritanceHelper
 
         while (currentLoc != null)
         {
-            if (!visited.Add(currentLoc.DefName + currentLoc.FilePath)) break; 
-            if (visited.Count > 15) break; 
+            if (!visited.Add(currentLoc.DefName + currentLoc.FilePath)) break;
+            if (visited.Count > 15) break;
             if (!PathSecurity.IsPathSafe(currentLoc.FilePath)) break;
 
             try
             {
                 if (!fileCache.TryGetValue(currentLoc.FilePath, out var doc))
                 {
-                    using var stream = new FileStream(currentLoc.FilePath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
+                    using var stream = new FileStream(currentLoc.FilePath, FileMode.Open, FileAccess.Read,
+                        FileShare.ReadWrite);
                     using var reader = XmlReader.Create(stream, SafeSettings);
                     doc = XDocument.Load(reader);
                     fileCache[currentLoc.FilePath] = doc;
@@ -38,7 +39,8 @@ public static class XmlInheritanceHelper
                 var nodes = doc.Root?.Elements() ?? Enumerable.Empty<XElement>();
                 foreach (var n in nodes)
                 {
-                    if (n.Element("defName")?.Value == currentLoc.DefName || n.Attribute("Name")?.Value == currentLoc.DefName)
+                    if (n.Element("defName")?.Value == currentLoc.DefName ||
+                        n.Attribute("Name")?.Value == currentLoc.DefName)
                     {
                         node = n;
                         break;
@@ -49,16 +51,21 @@ public static class XmlInheritanceHelper
                 {
                     hierarchy.Push(new XElement(node));
                     var parentName = currentLoc.ParentName;
-                    currentLoc = !string.IsNullOrEmpty(parentName) ? (indexer.GetParent(parentName) ?? indexer.GetDef(parentName)) : null;
+                    currentLoc = !string.IsNullOrEmpty(parentName)
+                        ? (indexer.GetParent(parentName) ?? indexer.GetDef(parentName))
+                        : null;
                 }
                 else break;
             }
-            catch { break; }
+            catch
+            {
+                break;
+            }
         }
 
         if (hierarchy.Count == 0) return "Failed to load Def XML";
 
-        XElement result = new XElement(hierarchy.Peek().Name); 
+        XElement result = new XElement(hierarchy.Peek().Name);
         while (hierarchy.Count > 0) MergeXml(result, hierarchy.Pop());
         return result.ToString();
     }
@@ -73,9 +80,15 @@ public static class XmlInheritanceHelper
             var elementNames = childElements.Select(e => e.Name).Distinct();
             foreach (var name in elementNames) parent.Elements(name).Remove();
         }
+
         foreach (var childNode in childElements)
         {
-            if (childNode.Name.LocalName == "li") { parent.Add(new XElement(childNode)); continue; }
+            if (childNode.Name.LocalName == "li")
+            {
+                parent.Add(new XElement(childNode));
+                continue;
+            }
+
             var existingNode = parent.Element(childNode.Name);
             if (existingNode != null && childNode.HasElements) MergeXml(existingNode, childNode);
             else if (existingNode != null) existingNode.Value = childNode.Value;

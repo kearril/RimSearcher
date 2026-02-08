@@ -6,18 +6,27 @@ namespace RimSearcher.Core;
 public class SourceIndexer
 {
     private readonly ConcurrentDictionary<string, ConcurrentBag<string>> _index = new(StringComparer.OrdinalIgnoreCase);
-    private readonly ConcurrentDictionary<string, ConcurrentBag<string>> _typeMap = new(StringComparer.OrdinalIgnoreCase);
+
+    private readonly ConcurrentDictionary<string, ConcurrentBag<string>> _typeMap =
+        new(StringComparer.OrdinalIgnoreCase);
+
     private readonly ConcurrentDictionary<string, string> _inheritanceMap = new(StringComparer.OrdinalIgnoreCase);
-    private readonly ConcurrentDictionary<string, ConcurrentBag<string>> _inheritorsMap = new(StringComparer.OrdinalIgnoreCase);
-    private readonly ConcurrentDictionary<string, ConcurrentBag<string>> _shortTypeMap = new(StringComparer.OrdinalIgnoreCase);
+
+    private readonly ConcurrentDictionary<string, ConcurrentBag<string>> _inheritorsMap =
+        new(StringComparer.OrdinalIgnoreCase);
+
+    private readonly ConcurrentDictionary<string, ConcurrentBag<string>> _shortTypeMap =
+        new(StringComparer.OrdinalIgnoreCase);
+
     private readonly ConcurrentDictionary<string, byte> _processedFiles = new(StringComparer.OrdinalIgnoreCase);
     private List<string> _cachedAllTypeNames = new();
 
     public void Scan(string rootPath)
     {
         if (!Directory.Exists(rootPath)) return;
-        var blacklistedDirs = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "bin", "obj", ".git", ".vs", ".idea", ".build", "temp" };
-        
+        var blacklistedDirs = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+            { "bin", "obj", ".git", ".vs", ".idea", ".build", "temp" };
+
         // Use iterative file scanning instead of recursion to avoid potential stack overflow in deeply nested structures.
         var allFiles = CollectFilesIterative(rootPath, blacklistedDirs);
         var newFiles = allFiles.Where(f => _processedFiles.TryAdd(Path.GetFullPath(f), 0)).ToList();
@@ -46,7 +55,8 @@ public class SourceIndexer
             }
         });
 
-        _cachedAllTypeNames = _typeMap.Keys.Concat(_shortTypeMap.Keys).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+        _cachedAllTypeNames =
+            _typeMap.Keys.Concat(_shortTypeMap.Keys).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
     }
 
     private List<string> CollectFilesIterative(string rootPath, HashSet<string> blacklistedDirs)
@@ -73,8 +83,11 @@ public class SourceIndexer
                     }
                 }
             }
-            catch { }
+            catch
+            {
+            }
         }
+
         return result;
     }
 
@@ -104,6 +117,7 @@ public class SourceIndexer
             current = ResolveToFullName(parent);
             if (current == null || chain.Count > 20) break;
         }
+
         return chain;
     }
 
@@ -112,8 +126,10 @@ public class SourceIndexer
         if (_typeMap.TryGetValue(typeName, out var paths)) return paths.ToList();
         if (_shortTypeMap.TryGetValue(typeName, out var fullNames))
         {
-            return fullNames.Distinct().SelectMany(fn => _typeMap.TryGetValue(fn, out var p) ? p : Enumerable.Empty<string>()).ToList();
+            return fullNames.Distinct()
+                .SelectMany(fn => _typeMap.TryGetValue(fn, out var p) ? p : Enumerable.Empty<string>()).ToList();
         }
+
         return new List<string>();
     }
 
@@ -121,20 +137,34 @@ public class SourceIndexer
         _cachedAllTypeNames.Where(k => k.Contains(query, StringComparison.OrdinalIgnoreCase)).Take(20).ToList();
 
     public List<string> Search(string query) =>
-        _index.Where(kv => kv.Key.Contains(query, StringComparison.OrdinalIgnoreCase)).SelectMany(kv => kv.Value).ToList();
+        _index.Where(kv => kv.Key.Contains(query, StringComparison.OrdinalIgnoreCase)).SelectMany(kv => kv.Value)
+            .ToList();
 
-    public async Task<(List<(string Path, string Preview)> Results, bool Truncated)> SearchRegexAsync(string pattern, bool ignoreCase = true)
+    public async Task<(List<(string Path, string Preview)> Results, bool Truncated)> SearchRegexAsync(
+        string pattern,
+        bool ignoreCase = true,
+        CancellationToken ct = default,
+        IProgress<double>? progress = null)
     {
         var results = new ConcurrentBag<(string Path, string Preview)>();
-        var regex = new Regex(pattern, (ignoreCase ? RegexOptions.IgnoreCase : RegexOptions.None) | RegexOptions.Compiled, TimeSpan.FromSeconds(1));
+        var regex = new Regex(pattern,
+            (ignoreCase ? RegexOptions.IgnoreCase : RegexOptions.None) | RegexOptions.Compiled,
+            TimeSpan.FromSeconds(1));
         var allFiles = _index.Values.SelectMany(x => x).Distinct().ToList();
-        
+
         int globalCount = 0;
+        int processedCount = 0;
+        int totalFiles = allFiles.Count;
         bool truncated = false;
 
-        await Parallel.ForEachAsync(allFiles, async (filePath, ct) =>
+        await Parallel.ForEachAsync(allFiles, ct, async (filePath, internalCt) =>
         {
-            if (globalCount >= 100) { truncated = true; return; }
+            if (globalCount >= 100)
+            {
+                truncated = true;
+                return;
+            }
+
             try
             {
                 using var stream = new FileStream(filePath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
@@ -143,7 +173,7 @@ public class SourceIndexer
                 int lineNum = 0;
                 int matchesInThisFile = 0;
 
-                while ((line = await reader.ReadLineAsync(ct)) != null)
+                while ((line = await reader.ReadLineAsync(internalCt)) != null)
                 {
                     lineNum++;
                     if (regex.IsMatch(line))
@@ -151,12 +181,23 @@ public class SourceIndexer
                         results.Add((filePath, $"L{lineNum}: {line.Trim()}"));
                         matchesInThisFile++;
                         Interlocked.Increment(ref globalCount);
-                        if (matchesInThisFile >= 5 || globalCount >= 100) break; 
+                        if (matchesInThisFile >= 5 || globalCount >= 100) break;
                     }
+
                     if (lineNum > 20000) break;
                 }
             }
-            catch { }
+            catch
+            {
+            }
+            finally
+            {
+                var current = Interlocked.Increment(ref processedCount);
+                if (current % 10 == 0 || current == totalFiles)
+                {
+                    progress?.Report((double)current / totalFiles);
+                }
+            }
         });
         return (results.Take(100).ToList(), truncated || globalCount >= 100);
     }

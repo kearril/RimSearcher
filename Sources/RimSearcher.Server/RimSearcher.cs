@@ -1,27 +1,40 @@
 using System.Text.Json;
+using System.Collections.Concurrent;
 using RimSearcher.Server.Tools;
 
 namespace RimSearcher.Server;
 
+/// <summary>
+/// Core class for the RimSearcher MCP server, handling JSON-RPC communication and tool dispatching.
+/// </summary>
 public sealed class RimSearcher
 {
     private readonly Dictionary<string, ITool> _tools = new();
+    private readonly ConcurrentDictionary<string, CancellationTokenSource> _activeRequests = new();
     private readonly SemaphoreSlim _writeLock = new(1, 1);
     private readonly TextWriter _protocolOut;
-    
+
     // Limit max concurrency to balance response speed and system resource consumption.
     private readonly SemaphoreSlim _concurrencyLimit = new(10, 10);
 
     public RimSearcher(TextWriter? protocolOut = null)
     {
         _protocolOut = protocolOut ?? Console.Out;
+        // Bind global logger delegate
+        ServerLogger.OnLogAsync = (msg, level) => this.LogAsync(msg, level);
     }
 
+    /// <summary>
+    /// Registers an MCP tool.
+    /// </summary>
     public void RegisterTool(ITool tool)
     {
         _tools[tool.Name] = tool;
     }
 
+    /// <summary>
+    /// Starts the server main loop, reading JSON-RPC messages from standard input.
+    /// </summary>
     public async Task RunAsync()
     {
         while (true)
@@ -33,7 +46,10 @@ public sealed class RimSearcher
 
             _ = Task.Run(async () =>
             {
-                object? id = null;
+                object? requestId = null;
+                string? requestKey = null;
+                CancellationTokenSource? cts = null;
+
                 try
                 {
                     using var doc = JsonDocument.Parse(line);
@@ -47,29 +63,58 @@ public sealed class RimSearcher
                     }
 
                     var method = methodProp.GetString();
-                    bool hasId = root.TryGetProperty("id", out var idProp);
-                    if (hasId) id = idProp;
 
-                    await HandleRequestAsync(method, id, root);
+                    // Handle JSON-RPC cancellation notifications
+                    if (method == "$.cancelRequest")
+                    {
+                        if (root.TryGetProperty("params", out var p) && p.TryGetProperty("id", out var cancelId))
+                        {
+                            var idToCancel = cancelId.ToString(); // Use string for internal dictionary key
+                            if (_activeRequests.TryRemove(idToCancel, out var targetCts))
+                            {
+                                targetCts.Cancel();
+                                await ServerLogger.Debug($"Client cancelled request {idToCancel}");
+                            }
+                        }
+                        return;
+                    }
+
+                    bool hasId = root.TryGetProperty("id", out var idProp);
+                    if (hasId)
+                    {
+                        requestId = idProp; // Keep original JsonElement for response to ensure ID type consistency
+                        requestKey = idProp.ToString(); // Use string as key for tracking
+                        cts = new CancellationTokenSource();
+                        _activeRequests[requestKey] = cts;
+                    }
+
+                    await HandleRequestAsync(method, requestId, root, cts?.Token ?? CancellationToken.None);
                 }
                 catch (JsonException)
                 {
                     await SendResponseAsync(null, error: new { code = -32700, message = "Parse error" });
                 }
+                catch (OperationCanceledException)
+                {
+                    if (requestId != null)
+                        await SendResponseAsync(requestId, error: new { code = -32000, message = "Request cancelled" });
+                }
                 catch (Exception ex)
                 {
-                    if (id != null)
-                        await SendResponseAsync(id, error: new { code = -32603, message = $"Internal error: {ex.Message}" });
+                    if (requestId != null)
+                        await SendResponseAsync(requestId, error: new { code = -32603, message = $"Internal error: {ex.Message}" });
                 }
                 finally
                 {
+                    if (requestKey != null) _activeRequests.TryRemove(requestKey, out _);
+                    cts?.Dispose();
                     _concurrencyLimit.Release();
                 }
             });
         }
     }
 
-    private async Task HandleRequestAsync(string? method, object? id, JsonElement root)
+    private async Task HandleRequestAsync(string? method, object? id, JsonElement root, CancellationToken ct)
     {
         try
         {
@@ -77,18 +122,24 @@ public sealed class RimSearcher
             {
                 await SendResponseAsync(id, new
                 {
-                    protocolVersion = "2024-11-05",
-                    capabilities = new { tools = new { } },
-                    serverInfo = new { 
-                        name = "RimWorld-Expert-Source-Analyzer", 
-                        version = "1.1",
+                    protocolVersion = "2025-11-25",
+                    capabilities = new
+                    {
+                        tools = new { },
+                        logging = new { },
+                        progress = new { }
+                    },
+                    serverInfo = new
+                    {
+                        name = "RimWorld-Expert-Source-Analyzer",
+                        version = "2.0",
                         description = "Specialized MCP server for deep RimWorld source code and XML Def analysis."
                     }
                 });
             }
             else if (method == "notifications/initialized")
             {
-                await Console.Error.WriteLineAsync("MCP handshake complete.");
+                await LogAsync("RimSearcher server initialized and ready to handle requests.", "info");
             }
             else if (method == "list_tools" || method == "tools/list")
             {
@@ -99,7 +150,8 @@ public sealed class RimSearcher
                     {
                         name = t.Name,
                         description = t.Description,
-                        inputSchema = t.JsonSchema
+                        inputSchema = t.JsonSchema,
+                        annotations = t.Icon != null ? new { icon = t.Icon } : null
                     })
                 });
             }
@@ -111,8 +163,23 @@ public sealed class RimSearcher
 
                 if (toolName != null && _tools.TryGetValue(toolName, out var tool))
                 {
-                    var result = await tool.ExecuteAsync(paramsElem.GetProperty("arguments"));
-                    await SendResponseAsync(id, new { content = new[] { new { type = "text", text = result } } });
+                    // Create progress reporter to send MCP notifications
+                    var progressReporter = new Progress<double>(async p => 
+                    {
+                        await SendNotificationAsync("notifications/progress", new 
+                        {
+                            progress = p,
+                            total = 1.0,
+                            progressToken = id // Progress is tied to the request ID
+                        });
+                    });
+
+                    var result = await tool.ExecuteAsync(paramsElem.GetProperty("arguments"), ct, progressReporter);
+                    await SendResponseAsync(id, new
+                    {
+                        content = new[] { new { type = "text", text = result.Content } },
+                        isError = result.IsError
+                    });
                 }
                 else
                 {
@@ -120,6 +187,7 @@ public sealed class RimSearcher
                 }
             }
         }
+        catch (OperationCanceledException) { throw; }
         catch (Exception ex)
         {
             if (id != null)
@@ -127,12 +195,42 @@ public sealed class RimSearcher
         }
     }
 
+    /// <summary>
+    /// Sends a logging notification to the MCP client.
+    /// </summary>
+    public async Task LogAsync(string message, string level = "info", string? logger = "RimSearcher")
+    {
+        await SendNotificationAsync("notifications/logging/message", new
+        {
+            level = level,
+            logger = logger,
+            data = message
+        });
+    }
+
+    private async Task SendNotificationAsync(string method, object? @params = null)
+    {
+        var notification = new { jsonrpc = "2.0", method = method, @params = @params };
+        var json = JsonSerializer.Serialize(notification);
+
+        await _writeLock.WaitAsync();
+        try
+        {
+            await _protocolOut.WriteLineAsync(json);
+            await _protocolOut.FlushAsync();
+        }
+        finally
+        {
+            _writeLock.Release();
+        }
+    }
+
     private async Task SendResponseAsync(object? id, object? result = null, object? error = null)
     {
-        if (id == null && error == null) return; 
+        if (id == null && error == null) return;
 
-        object response = error != null 
-            ? new { jsonrpc = "2.0", id = id, error = error } 
+        object response = error != null
+            ? new { jsonrpc = "2.0", id = id, error = error }
             : new { jsonrpc = "2.0", id = id, result = result };
 
         var json = JsonSerializer.Serialize(response);

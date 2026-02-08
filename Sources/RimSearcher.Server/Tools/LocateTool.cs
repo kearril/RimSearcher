@@ -17,23 +17,33 @@ public class LocateTool : ITool
     }
 
     public string Name => "rimworld-searcher__locate";
-    public string Description => "Globally locates resources. Use this as the first step when you know a DefName or Class name but don't know where it's defined. Supports fuzzy searching across C# types, DefNames, filenames, and paths.";
 
-    public object JsonSchema => new {
+    public string Description =>
+        "The mandatory entry point for any RimWorld analysis. Instantly maps a DefName, C# Type, or filename to its physical disk path across Core and all active Mods. Use this tool first whenever the target file path is unknown to ensure subsequent tools have the correct file context.";
+
+    public string? Icon => "lucide:map-pin";
+
+    public object JsonSchema => new
+    {
         type = "object",
-        properties = new {
-            query = new { 
-                type = "string", 
-                description = "The search term (DefName, Class name, or partial filename). Example: 'ShieldBelt' or 'Pawn_HealthTracker'. Case-insensitive fuzzy matching is supported." 
+        properties = new
+        {
+            query = new
+            {
+                type = "string",
+                description =
+                    "The term to find (DefName, Class, or filename). Example: 'Apparel_ShieldBelt' or 'RimWorld.Pawn'."
             }
         },
         required = new[] { "query" }
     };
 
-    public async Task<string> ExecuteAsync(JsonElement args)
+    public async Task<ToolResult> ExecuteAsync(JsonElement args, CancellationToken cancellationToken, IProgress<double>? progress = null)
     {
         var query = args.GetProperty("query").GetString();
-        if (string.IsNullOrEmpty(query)) return "Query cannot be empty.";
+        if (string.IsNullOrEmpty(query)) return new ToolResult("Query cannot be empty.", true);
+
+        cancellationToken.ThrowIfCancellationRequested();
 
         var sb = new StringBuilder();
         sb.AppendLine($"# Search Results for: '{query}'");
@@ -81,8 +91,8 @@ public class LocateTool : ITool
         var result = sb.ToString();
         if (string.IsNullOrWhiteSpace(result) || result.Split('\n').Length <= 2)
         {
-            return $"No resources found matching '{query}'.\nTips:\n1. Try a partial name (e.g., 'Shield' instead of 'Apparel_ShieldBelt').\n2. Use 'search_regex' if you are looking for specific content inside files.";
+            return new ToolResult($"No resources found matching '{query}'.\nTips:\n1. Try a partial name.\n2. Use 'search_regex' for content inside files.", true);
         }
-        return result;
+        return new ToolResult(result);
     }
 }

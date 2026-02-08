@@ -18,13 +18,13 @@ public static class RoslynHelper
             using var stream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
             using var reader = new StreamReader(stream);
             var code = reader.ReadToEnd();
-            
+
             var tree = CSharpSyntaxTree.ParseText(code);
             var root = tree.GetCompilationUnitRoot();
 
             return root.DescendantNodes()
                 .OfType<TypeDeclarationSyntax>()
-                .Select(t => 
+                .Select(t =>
                 {
                     var fullName = GetFullTypeName(t);
                     var baseType = t.BaseList?.Types.FirstOrDefault()?.ToString();
@@ -33,7 +33,10 @@ public static class RoslynHelper
                 .GroupBy(x => x.FullName)
                 .ToDictionary(g => g.Key, g => g.First().Base);
         }
-        catch { return new Dictionary<string, string?>(); }
+        catch
+        {
+            return new Dictionary<string, string?>();
+        }
     }
 
     private static string GetFullTypeName(TypeDeclarationSyntax typeDeclaration)
@@ -48,16 +51,17 @@ public static class RoslynHelper
             else if (parent is FileScopedNamespaceDeclarationSyntax fns) nameStack.Push(fns.Name.ToString());
             parent = parent.Parent;
         }
+
         return string.Join(".", nameStack);
     }
 
     public static async Task<string> GetClassOutlineAsync(string filePath, string? targetTypeName = null)
     {
         if (!File.Exists(filePath)) return "File not found.";
-        
+
         // Limit file size to prevent excessive memory usage during parsing.
         if (new FileInfo(filePath).Length > MaxFileSize) return "File too large (over 2MB), skipping parsing.";
-        
+
         string code;
         using (var stream = new FileStream(filePath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite))
         using (var reader = new StreamReader(stream))
@@ -74,14 +78,15 @@ public static class RoslynHelper
         foreach (var type in types)
         {
             var fullName = GetFullTypeName(type);
-            if (!string.IsNullOrEmpty(targetTypeName) && 
+            if (!string.IsNullOrEmpty(targetTypeName) &&
                 !fullName.Equals(targetTypeName, StringComparison.OrdinalIgnoreCase) &&
                 !type.Identifier.Text.Equals(targetTypeName, StringComparison.OrdinalIgnoreCase))
             {
                 continue;
             }
 
-            string kind = type switch {
+            string kind = type switch
+            {
                 ClassDeclarationSyntax => "Class",
                 StructDeclarationSyntax => "Struct",
                 InterfaceDeclarationSyntax => "Interface",
@@ -90,28 +95,36 @@ public static class RoslynHelper
             };
 
             sb.AppendLine($"{kind}: {fullName} {type.TypeParameterList}");
-            foreach (var prop in type.Members.OfType<PropertyDeclarationSyntax>()) sb.AppendLine($"  Property: {prop.Type} {prop.Identifier.Text}");
+            foreach (var prop in type.Members.OfType<PropertyDeclarationSyntax>())
+                sb.AppendLine($"  Property: {prop.Type} {prop.Identifier.Text}");
             foreach (var field in type.Members.OfType<FieldDeclarationSyntax>())
             {
                 var fieldName = string.Join(", ", field.Declaration.Variables.Select(v => v.Identifier.Text));
                 sb.AppendLine($"  Field: {field.Declaration.Type} {fieldName}");
             }
+
             foreach (var method in type.Members.OfType<MethodDeclarationSyntax>())
             {
-                var parameters = string.Join(", ", method.ParameterList.Parameters.Select(p => $"{p.Type} {p.Identifier.Text}"));
+                var parameters = string.Join(", ",
+                    method.ParameterList.Parameters.Select(p => $"{p.Type} {p.Identifier.Text}"));
                 sb.AppendLine($"  Method: {method.ReturnType} {method.Identifier.Text}({parameters})");
             }
+
             sb.AppendLine();
         }
 
-        return sb.Length > 0 ? sb.ToString() : (targetTypeName != null ? $"Type not found in file: {targetTypeName}" : "No type definitions found in file.");
+        return sb.Length > 0
+            ? sb.ToString()
+            : (targetTypeName != null
+                ? $"Type not found in file: {targetTypeName}"
+                : "No type definitions found in file.");
     }
 
     public static async Task<string> GetMethodBodyAsync(string filePath, string methodName, string? typeName = null)
     {
         if (!File.Exists(filePath)) return "File not found.";
         if (new FileInfo(filePath).Length > MaxFileSize) return "File too large (over 2MB), skipping parsing.";
-        
+
         string code;
         using (var stream = new FileStream(filePath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite))
         using (var reader = new StreamReader(stream))
@@ -123,11 +136,12 @@ public static class RoslynHelper
         var root = await tree.GetRootAsync();
 
         var methods = root.DescendantNodes().OfType<MethodDeclarationSyntax>();
-        var matches = methods.Where(m => m.Identifier.Text.Equals(methodName, StringComparison.OrdinalIgnoreCase)).ToList();
-        
+        var matches = methods.Where(m => m.Identifier.Text.Equals(methodName, StringComparison.OrdinalIgnoreCase))
+            .ToList();
+
         if (!string.IsNullOrEmpty(typeName))
         {
-            matches = matches.Where(m => 
+            matches = matches.Where(m =>
             {
                 var parentType = m.Ancestors().OfType<TypeDeclarationSyntax>().FirstOrDefault();
                 return parentType != null && (
@@ -137,7 +151,7 @@ public static class RoslynHelper
             }).ToList();
         }
 
-        if (matches.Count == 0) 
+        if (matches.Count == 0)
         {
             var availableMethods = methods.Select(m => m.Identifier.Text).Distinct().OrderBy(n => n).ToList();
             var sbErr = new StringBuilder();
@@ -148,9 +162,10 @@ public static class RoslynHelper
                 foreach (var mName in availableMethods) sbErr.AppendLine($"- {mName}");
                 sbErr.AppendLine("\nHint: Choose one of the method names above and call 'read_code' again.");
             }
+
             return sbErr.ToString();
         }
-        
+
         if (matches.Count == 1)
         {
             var m = matches[0];
@@ -169,6 +184,7 @@ public static class RoslynHelper
             sb.AppendLine(m.ToFullString());
             sb.AppendLine("\n// --- NEXT MATCH ---\n");
         }
+
         return sb.ToString();
     }
 }

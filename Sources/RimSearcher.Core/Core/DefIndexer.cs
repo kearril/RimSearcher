@@ -11,15 +11,19 @@ public class DefIndexer
 {
     private readonly ConcurrentDictionary<string, DefLocation> _defNameIndex = new(StringComparer.OrdinalIgnoreCase);
     private readonly ConcurrentDictionary<string, DefLocation> _parentNameIndex = new(StringComparer.OrdinalIgnoreCase);
-    private readonly ConcurrentDictionary<string, ConcurrentBag<DefLocation>> _labelIndex = new(StringComparer.OrdinalIgnoreCase);
+
+    private readonly ConcurrentDictionary<string, ConcurrentBag<DefLocation>> _labelIndex =
+        new(StringComparer.OrdinalIgnoreCase);
+
     private readonly ConcurrentDictionary<string, byte> _processedFiles = new(StringComparer.OrdinalIgnoreCase);
-    
+
     private static readonly XmlReaderSettings SafeSettings = new() { DtdProcessing = DtdProcessing.Prohibit };
 
     public void Scan(string rootPath)
     {
         if (!Directory.Exists(rootPath)) return;
-        var blacklistedDirs = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "bin", "obj", ".git", ".vs", ".idea", ".build", "temp" };
+        var blacklistedDirs = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+            { "bin", "obj", ".git", ".vs", ".idea", ".build", "temp" };
 
         var allFiles = new List<string>();
         var stack = new Stack<string>();
@@ -36,7 +40,9 @@ public class DefIndexer
                     if (!blacklistedDirs.Contains(Path.GetFileName(dir))) stack.Push(dir);
                 }
             }
-            catch { }
+            catch
+            {
+            }
         }
 
         var newFiles = allFiles.Where(f => _processedFiles.TryAdd(Path.GetFullPath(f), 0)).ToList();
@@ -60,7 +66,7 @@ public class DefIndexer
                     nodeIdx++;
                     var defType = node.Name.LocalName;
                     var defName = node.Element("defName")?.Value;
-                    var name = node.Attribute("Name")?.Value; 
+                    var name = node.Attribute("Name")?.Value;
                     var parentName = node.Attribute("ParentName")?.Value;
                     var label = node.Element("label")?.Value;
 
@@ -74,10 +80,13 @@ public class DefIndexer
                         var bag = _labelIndex.GetOrAdd(label, _ => new ConcurrentBag<DefLocation>());
                         bag.Add(loc);
                     }
+
                     Interlocked.Increment(ref totalParsed);
                 }
             }
-            catch { }
+            catch
+            {
+            }
         });
 
         Console.Error.WriteLine($"[DefIndexer] Scanning complete. Successfully parsed: {totalParsed}");
@@ -98,6 +107,10 @@ public class DefIndexer
         return results.GroupBy(x => $"{x.DefType}/{x.DefName}").Select(g => g.First()).Take(50).ToList();
     }
 
-    public DefLocation? GetDef(string name) => _defNameIndex.TryGetValue(name, out var loc) ? loc : (_parentNameIndex.TryGetValue(name, out var locP) ? locP : null);
-    public DefLocation? GetParent(string parentName) => _parentNameIndex.TryGetValue(parentName, out var loc) ? loc : null;
+    public DefLocation? GetDef(string name) => _defNameIndex.TryGetValue(name, out var loc)
+        ? loc
+        : (_parentNameIndex.TryGetValue(name, out var locP) ? locP : null);
+
+    public DefLocation? GetParent(string parentName) =>
+        _parentNameIndex.TryGetValue(parentName, out var loc) ? loc : null;
 }

@@ -26,6 +26,8 @@ if (appConfig.CsharpSourcePaths.Count == 0 && appConfig.XmlSourcePaths.Count == 
 
 PathSecurity.Initialize(appConfig.CsharpSourcePaths.Concat(appConfig.XmlSourcePaths));
 
+var server = new RimSearcher.Server.RimSearcher(protocolOut);
+
 var indexer = new SourceIndexer();
 var defIndexer = new DefIndexer();
 
@@ -33,7 +35,7 @@ foreach (var path in appConfig.CsharpSourcePaths)
 {
     if (Directory.Exists(path))
     {
-        Console.Error.WriteLine($"[Indexer] Scanning C# source: {path} ...");
+        await ServerLogger.Info($"[Indexer] Scanning C# source: {path} ...");
         indexer.Scan(path);
     }
 }
@@ -42,12 +44,12 @@ foreach (var path in appConfig.XmlSourcePaths)
 {
     if (Directory.Exists(path))
     {
-        Console.Error.WriteLine($"[Indexer] Scanning Def XML: {path} ...");
+        await ServerLogger.Info($"[Indexer] Scanning Def XML: {path} ...");
         defIndexer.Scan(path);
+        indexer.Scan(path); // Also index for raw text search
     }
 }
 
-var server = new RimSearcher.Server.RimSearcher(protocolOut);
 server.RegisterTool(new ListDirectoryTool());
 server.RegisterTool(new LocateTool(indexer, defIndexer));
 server.RegisterTool(new InspectTool(indexer, defIndexer));
