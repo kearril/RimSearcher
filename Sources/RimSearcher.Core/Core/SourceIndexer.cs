@@ -93,8 +93,37 @@ public class SourceIndexer
 
     public List<string> GetInheritors(string baseTypeName)
     {
-        var fullName = ResolveToFullName(baseTypeName) ?? baseTypeName;
-        return _inheritorsMap.TryGetValue(fullName, out var inheritors) ? inheritors.ToList() : new List<string>();
+        var results = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        
+        // 1. Check exact match (could be full name or short name depending on how it was scanned)
+        if (_inheritorsMap.TryGetValue(baseTypeName, out var directInheritors))
+        {
+            foreach (var item in directInheritors) results.Add(item);
+        }
+
+        // 2. If it's a short name, check all its corresponding full names
+        if (_shortTypeMap.TryGetValue(baseTypeName, out var fullNames))
+        {
+            foreach (var fullName in fullNames)
+            {
+                if (_inheritorsMap.TryGetValue(fullName, out var inheritors))
+                {
+                    foreach (var item in inheritors) results.Add(item);
+                }
+            }
+        }
+
+        // 3. If it's a full name, also try its short name
+        var shortNameCandidate = baseTypeName.Contains('.') ? baseTypeName.Split('.').Last() : baseTypeName;
+        if (shortNameCandidate != baseTypeName)
+        {
+            if (_inheritorsMap.TryGetValue(shortNameCandidate, out var shortInheritors))
+            {
+                foreach (var item in shortInheritors) results.Add(item);
+            }
+        }
+
+        return results.ToList();
     }
 
     private string? ResolveToFullName(string typeName)
