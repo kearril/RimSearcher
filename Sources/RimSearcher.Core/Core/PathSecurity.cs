@@ -34,7 +34,7 @@ public static class PathSecurity
                 // 1. Exact match
                 if (fullPath.Equals(root, StringComparison.OrdinalIgnoreCase)) return true;
 
-                // 2. Subdirectory match (ensure D:\Source doesn't match D:\SourceCode)
+                // 2. Subdirectory match 
                 var rootWithSlash = root + Path.DirectorySeparatorChar;
                 if (fullPath.StartsWith(rootWithSlash, StringComparison.OrdinalIgnoreCase)) return true;
 

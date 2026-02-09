@@ -7,26 +7,25 @@ using RimSearcher.Server;
 Console.InputEncoding = Encoding.UTF8;
 Console.OutputEncoding = Encoding.UTF8;
 
-// Hijack standard output to standard error to ensure only explicit protocol streams use STDOUT, preventing protocol pollution.
+
 var protocolOut = Console.Out;
 Console.SetOut(Console.Error);
 
-var configPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "config.json");
-if (!File.Exists(configPath)) configPath = "config.json";
+var (appConfig, configPath, isLoaded) = AppConfig.Load();
+await ServerLogger.Info($"[Config] Loading configuration from: {configPath}");
 
-var appConfig = AppConfig.Load(configPath);
+bool hasPaths = appConfig.CsharpSourcePaths.Count > 0 || appConfig.XmlSourcePaths.Count > 0;
 
-appConfig.CsharpSourcePaths = appConfig.CsharpSourcePaths.Distinct().ToList();
-appConfig.XmlSourcePaths = appConfig.XmlSourcePaths.Distinct().ToList();
-
-if (appConfig.CsharpSourcePaths.Count == 0 && appConfig.XmlSourcePaths.Count == 0)
+if (!isLoaded)
 {
-    Console.Error.WriteLine("Warning: No source path configuration detected (config.json).");
+    Console.Error.WriteLine($"[Error] Configuration failed (File missing or JSON error) at: {configPath}");
+}
+else if (!hasPaths)
+{
+    Console.Error.WriteLine($"[Warning] No source paths defined in config: {configPath}");
 }
 
 PathSecurity.Initialize(appConfig.CsharpSourcePaths.Concat(appConfig.XmlSourcePaths));
-
-var server = new RimSearcher.Server.RimSearcher(protocolOut);
 
 var indexer = new SourceIndexer();
 var defIndexer = new DefIndexer();
@@ -38,6 +37,10 @@ foreach (var path in appConfig.CsharpSourcePaths)
         await ServerLogger.Info($"[Indexer] Scanning C# source: {path} ...");
         indexer.Scan(path);
     }
+    else
+    {
+        await ServerLogger.Warning($"[Indexer] C# source path not found: {path}");
+    }
 }
 
 foreach (var path in appConfig.XmlSourcePaths)
@@ -48,7 +51,14 @@ foreach (var path in appConfig.XmlSourcePaths)
         defIndexer.Scan(path);
         indexer.Scan(path); // Also index for raw text search
     }
+    else
+    {
+        await ServerLogger.Warning($"[Indexer] Def XML path not found: {path}");
+    }
 }
+
+// Instantiate server AFTER scanning to ensure STDOUT is reserved for protocol use only after initialization.
+var server = new RimSearcher.Server.RimSearcher(protocolOut);
 
 server.RegisterTool(new ListDirectoryTool());
 server.RegisterTool(new LocateTool(indexer, defIndexer));
@@ -57,6 +67,9 @@ server.RegisterTool(new TraceTool(indexer));
 server.RegisterTool(new ReadCodeTool());
 server.RegisterTool(new SearchRegexTool(indexer));
 
-Console.Error.WriteLine("RimWorld MCP Server started...");
+if (isLoaded && hasPaths)
+{
+    Console.Error.WriteLine("RimSearcher MCP Server started...");
+}
 
 await server.RunAsync();

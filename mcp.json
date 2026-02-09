@@ -1,10 +1,11 @@
 ﻿{
   "mcpServers": {
-    "rimworld-searcher": {
-      "args": [
-      ],
-      "command": "Folder path to RimSearcher.Server.exe",
-      "cwd": "Folder path to RimSearcher"
+    "RimSearcher": {
+      "command": "D:/path/to/RimSearcher.Server.exe",
+      "args": [],
+      "env": {
+        "RIMSEARCHER_CONFIG": "D:/your/custom/path/config.json"
+      }
     }
   }
 }
