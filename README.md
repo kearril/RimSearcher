@@ -4,7 +4,7 @@ RimSearcher 是 一个 基于 Model Context Protocol (MCP) 构建的高性能服
 
 本项目专门针对 RimWorld 模组开发和源码研究而设计，利用 C# 14 和 .NET 10 的先进特性，结合 Roslyn 编译器平台，彻底解决了 AI 因无法直接访问本地源码而导致的“知识盲区”和“幻觉”问题。
 
-本项目借助 Gemini 完成。
+本项目借助了 Gemini 
 
 ---
 
