@@ -119,7 +119,7 @@ public class TraceTool : ITool
             var output = string.Join(Environment.NewLine, results.Take(50).Select(r => $"- `{r}`"));
             if (truncated || globalCount >= 50)
             {
-                output += "\n\n--- ⚠️ WARNING: Too many results, truncated to first 50. ---";
+                output += "\n\n--- WARNING: Too many results, truncated to first 50. ---";
             }
 
             return new ToolResult(output);

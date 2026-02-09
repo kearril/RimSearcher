@@ -51,7 +51,7 @@ public class SearchRegexTool : ITool
             var output = string.Join("\n\n", results.Select(r => $"File: `{r.Path}`\nMatch: {r.Preview}"));
             if (truncated)
             {
-                output += "\n\n--- ⚠️ WARNING: Search results exceeded limit and were truncated. ---";
+                output += "\n\n--- WARNING: Search results exceeded limit and were truncated. ---";
             }
 
             return new ToolResult(output);
