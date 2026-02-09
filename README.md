@@ -5,7 +5,7 @@
 
 RimSearcher 是 一个 基于 Model Context Protocol (MCP) 构建的高性能服务器，旨在为 AI 助手（如 Gemini, Claude 等）提供对 RimWorld 游戏源码（C#）和配置文件（XML）的高效检索与深度分析能力。
 
-本项目专门针对 RimWorld 模组开发和源码研究而设计，利用 C# 14 和 .NET 10 的先进特性，结合 Roslyn 编译器平台，彻底解决了 AI 因无法直接访问本地源码而导致的“知识盲区”和“幻觉”问题。
+本项目专门针对 RimWorld 模组开发和源码研究而设计，利用 C# 14 和 .NET 10 的先进特性，结合 Roslyn 编译器平台，彻底解决了 LLM 因无法直接访问本地源码而导致的“知识盲区”和“幻觉”问题。
 
 ---
 
@@ -99,7 +99,7 @@ RimSearcher 暴露了 6 个互补的工具，AI 会根据任务需求灵活调�
 
 ### 安装步骤
 1.  从 **[Releases](https://github.com/kearril/RimSearcher/releases)** 下载最新的 `RimSearcher.Server.exe`。
-2.  在同目录下创建 `config.json`：
+2.  创建 `config.json`作为mcp的源码路径索引：
     ```json
     {
       "CsharpSourcePaths": ["C:/Path/To/Your/RimWorld/Source"],
@@ -107,29 +107,36 @@ RimSearcher 暴露了 6 个互补的工具，AI 会根据任务需求灵活调�
       "XmlSourcePaths": ["C:/SteamLibrary/steamapps/common/RimWorld/Data"]
     }
     ```
->  *CsharpSourcePaths* 应指向你本地的 RimWorld 的 C# 源码目录
+>  *CsharpSourcePaths* 应指向你本地的 RimWorld 的反编译后的 C# 源码目录
+> 
 >  *XmlSourcePaths* 应指向 RimWorld 的 Data 目录（包含所有 XML 定义）
 
 3.  在 AI 助手配置中添加：（可能需要创建mcp.json文件）（copilot的配置文件似乎需要把mcpServers改为servers）
     ```json
     {
-         "mcpServers": {
-          "RimSearcher": {
+       "mcpServers": {
+         "RimSearcher": {
+           "command": "D:/path/to/RimSearcher.Server.exe",
            "args": [],
-           "command": "Folder path to RimSearcher.Server.exe",
-           "cwd": "Folder path to RimSearcher"
-         }
+           "env": {
+             "RIMSEARCHER_CONFIG": "D:/your/custom/path/config.json"
+          }
+        }
       }
     }
     ```
-> *command*需要指向RimSearcher.Server.exe的完整路径，*cwd*需要指向RimSearcher所在的文件夹路径
+> *command*需要指向RimSearcher.Server.exe的完整路径
+> 
+> *RIMSEARCHER_CONFIG*环境变量需要指向上面创建的config.json文件的完整路径
+> 
+> 该服务器的配置文件加载逻辑为：优先读取RIMSEARCHER_CONFIG环境变量指定的路径。如果未设置该环境变量，则会在当前工作目录下寻找config.json文件。
 
 ### 验证服务器
-首先我们必须确保RimSearcher.Server.exe和config.json在同一目录下，以及config.json中的路径设置正确。
+由于我们是手动验证服务器是否可以正常运行，所以需要确保RimSearcher.Server.exe和config.json在同一目录下，以及config.json中的路径设置正确。
 ![配置示例](Image/Snipaste_2026-02-07_23-20-57.png)
 然后运行RimSearcher.Server.exe，您应该会看到类似以下的输出，表示服务器已成功启动并加载了数据源：
-![启动成功示例](Image/Snipaste_2026-02-08_17-05-19.png)
-到此，RimSearcher 服务器已经成功运行，您可以在支持 MCP 的 AI 助手中调用相关工具进行源码查询和分析了！
+![启动成功示例](Image/Snipaste_2026-02-09_20-34-49.png)
+如果出现像上面图片一样的日志，那么恭喜你，RimSearcher 服务器已经成功运行，你可以在支持 MCP 的 AI 助手中调用相关工具进行源码查询和分析了！
 
 ---
 
