@@ -7,14 +7,12 @@
         <ImplicitUsings>enable</ImplicitUsings>
         <Nullable>enable</Nullable>
         <RootNamespace>RimSearcher.Server</RootNamespace>
-
-        <!-- 发布优化配置：极致单文件 -->
+        
         <PublishSingleFile>true</PublishSingleFile>
         <SelfContained>false</SelfContained>
         <PublishReadyToRun>true</PublishReadyToRun>
         <IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
         
-        <!-- 发布产物输出到解决方案根目录下的 Publish 文件夹 -->
         <PublishDir>..\Publish\</PublishDir>
         <DebugType>none</DebugType>
         <DebugSymbols>false</DebugSymbols>
