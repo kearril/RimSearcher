@@ -24,3 +24,4 @@ Thumbs.db
 
 # MCP project specific logs or temp files
 *.log
+/config.json
