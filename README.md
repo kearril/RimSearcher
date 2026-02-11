@@ -111,7 +111,7 @@ RimSearcher 暴露了 6 个互补的工具，AI 会根据任务需求灵活调�
 > 
 >  *XmlSourcePaths* 应指向 RimWorld 的 Data 目录（包含所有 XML 定义）
 
-3.  在 AI 助手配置中添加：（可能需要创建mcp.json文件）（copilot的配置文件似乎需要把mcpServers改为servers）
+3.  在大多数主流的 MCP 客户端（如 Gemini CLI、Claude Desktop）中添加服务器配置，指向 `RimSearcher.Server.exe` 的路径，并设置环境变量 `RIMSEARCHER_CONFIG` 指向上面创建的 `config.json` 文件路径。
     ```json
     {
        "mcpServers": {
@@ -125,11 +125,37 @@ RimSearcher 暴露了 6 个互补的工具，AI 会根据任务需求灵活调�
       }
     }
     ```
-> *command*需要指向RimSearcher.Server.exe的完整路径
-> 
-> *RIMSEARCHER_CONFIG*环境变量需要指向上面创建的config.json文件的完整路径
-> 
-> 该服务器的配置文件加载逻辑为：优先读取RIMSEARCHER_CONFIG环境变量指定的路径。如果未设置该环境变量，则会在当前工作目录下寻找config.json文件。
+ 而一些客户端又有些细微差异，例如
+**copilot**的配置文件为
+```json
+{
+  "servers": {
+    "RimSearcher": {
+      "command": "D:/path/to/RimSearcher.Server.exe",
+      "args": [],
+      "env": {
+        "RIMSEARCHER_CONFIG": "D:/your/custom/path/config.json"
+      }
+    }
+  }
+}
+```
+**opencode**的配置文件为
+```json
+      {
+        "mcp": {
+           "RimSearcher": {
+             "type": "local",
+             "command": ["D:/path/to/RimSearcher.Server.exe"],
+             "enabled": true,
+             "environment": {
+               "RIMSEARCHER_CONFIG": "D:/your/custom/path/config.json"
+            }
+          }
+        }
+      }
+```
+> 请根据你使用的 MCP 客户端的文档，正确配置服务器路径和环境变量。只要保证**command**和**env**的正确设置，RimSearcher 服务器就能正常工作。
 
 ### 验证服务器
 由于我们是手动验证服务器是否可以正常运行，所以需要确保RimSearcher.Server.exe和config.json在同一目录下，以及config.json中的路径设置正确。
