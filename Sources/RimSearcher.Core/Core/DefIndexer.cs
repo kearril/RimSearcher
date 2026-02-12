@@ -17,6 +17,9 @@ public class DefIndexer
 
     private readonly ConcurrentDictionary<string, byte> _processedFiles = new(StringComparer.OrdinalIgnoreCase);
 
+    // Global cache for parsed XML documents to speed up inheritance resolution.
+    private readonly ConcurrentDictionary<string, XDocument> _documentCache = new(StringComparer.OrdinalIgnoreCase);
+
     private static readonly XmlReaderSettings SafeSettings = new() { DtdProcessing = DtdProcessing.Prohibit };
 
     public void Scan(string rootPath)
@@ -52,44 +55,72 @@ public class DefIndexer
         {
             try
             {
-                // Limit file size to prevent memory overflow (OOM) when reading unusually large XML files.
-                if (new FileInfo(file).Length > 2 * 1024 * 1024) return;
-
                 using var stream = new FileStream(file, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
                 using var reader = XmlReader.Create(stream, SafeSettings);
-                var doc = XDocument.Load(reader);
-                if (doc.Root == null || doc.Root.Name.LocalName != "Defs") return;
+                
+                // Fast forward to the root <Defs> element
+                if (!reader.ReadToFollowing("Defs")) return;
 
                 int nodeIdx = 0;
-                foreach (var node in doc.Root.Elements())
+                while (reader.Read())
                 {
-                    nodeIdx++;
-                    var defType = node.Name.LocalName;
-                    var defName = node.Element("defName")?.Value;
-                    var name = node.Attribute("Name")?.Value;
-                    var parentName = node.Attribute("ParentName")?.Value;
-                    var label = node.Element("label")?.Value;
-
-                    string identifier = defName ?? name ?? $"[Unnamed_{defType}_{nodeIdx}]";
-                    var loc = new DefLocation(file, defType, identifier, parentName, label);
-
-                    if (!string.IsNullOrEmpty(defName)) _defNameIndex[defName] = loc;
-                    if (!string.IsNullOrEmpty(name)) _parentNameIndex[name] = loc;
-                    if (!string.IsNullOrEmpty(label))
+                    
+                    if (reader.NodeType == XmlNodeType.Element && reader.Depth == 1)
                     {
-                        var bag = _labelIndex.GetOrAdd(label, _ => new ConcurrentBag<DefLocation>());
-                        bag.Add(loc);
-                    }
+                        nodeIdx++;
+                        string defType = reader.LocalName;
+                        string? nameAttr = reader.GetAttribute("Name");
+                        string? parentNameAttr = reader.GetAttribute("ParentName");
+                        string? defName = null;
+                        string? label = null;
 
-                    Interlocked.Increment(ref totalParsed);
+                        if (!reader.IsEmptyElement)
+                        {
+                            int defDepth = reader.Depth;
+                            while (reader.Read() && reader.Depth > defDepth)
+                            {
+                                if (reader.NodeType == XmlNodeType.Element)
+                                {
+                                    if (reader.LocalName == "defName")
+                                        defName = reader.ReadElementContentAsString();
+                                    else if (reader.LocalName == "label")
+                                        label = reader.ReadElementContentAsString();
+                                }
+                            }
+                        }
+
+                        string identifier = defName ?? nameAttr ?? $"[Unnamed_{defType}_{nodeIdx}]";
+                        var loc = new DefLocation(file, defType, identifier, parentNameAttr, label);
+
+                        if (!string.IsNullOrEmpty(defName)) _defNameIndex[defName] = loc;
+                        if (!string.IsNullOrEmpty(nameAttr)) _parentNameIndex[nameAttr] = loc;
+                        if (!string.IsNullOrEmpty(label))
+                        {
+                            var bag = _labelIndex.GetOrAdd(label, _ => new ConcurrentBag<DefLocation>());
+                            bag.Add(loc);
+                        }
+
+                        Interlocked.Increment(ref totalParsed);
+                    }
                 }
             }
             catch
             {
+                // Skip malformed XML files
             }
         });
 
-        Console.Error.WriteLine($"[DefIndexer] Scanning complete. Successfully parsed: {totalParsed}");
+        Console.Error.WriteLine($"[DefIndexer] Scanning complete. Successfully parsed: {totalParsed} Defs");
+    }
+
+    public XDocument GetOrLoadDocument(string filePath)
+    {
+        return _documentCache.GetOrAdd(filePath, path =>
+        {
+            using var stream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
+            using var reader = XmlReader.Create(stream, SafeSettings);
+            return XDocument.Load(reader);
+        });
     }
 
     public List<DefLocation> Search(string query)

@@ -1,3 +1,4 @@
+using System.Text;
 using System.Text.Json;
 using RimSearcher.Core;
 
@@ -37,7 +38,7 @@ public class ReadCodeTool : ITool
             lineCount = new
             {
                 type = "integer",
-                description = "Optional: Number of lines to read. Defaults to 100."
+                description = "Optional: Number of lines to read. Defaults to 300."
             }
         },
         required = new[] { "path" }
@@ -73,29 +74,30 @@ public class ReadCodeTool : ITool
 
         // Fallback to line-based paginated reading mode.
         int startLine = args.TryGetProperty("startLine", out var sProp) ? sProp.GetInt32() : 0;
-        int lineCount = args.TryGetProperty("lineCount", out var lProp) ? lProp.GetInt32() : 100;
+        int lineCount = args.TryGetProperty("lineCount", out var lProp) ? lProp.GetInt32() : 300;
 
         try
         {
-            var resultLines = new List<string>();
-            int currentLine = 0;
-
-            foreach (var line in File.ReadLines(path))
-            {
-                cancellationToken.ThrowIfCancellationRequested();
-                if (currentLine >= startLine && currentLine < startLine + lineCount)
-                {
-                    resultLines.Add($"L{currentLine + 1}: {line}");
-                }
-
-                currentLine++;
-                if (currentLine >= startLine + lineCount) break;
-            }
+            var allLines = File.ReadAllLines(path);
+            int totalLines = allLines.Length;
+            
+            var resultLines = allLines.Skip(startLine).Take(lineCount).Select((line, idx) => $"L{startLine + idx + 1}: {line}").ToList();
 
             if (resultLines.Count == 0)
-                return new ToolResult($"Line range {startLine}-{startLine + lineCount} exceeds file length.", true);
+                return new ToolResult($"Line range {startLine}-{startLine + lineCount} exceeds file length ({totalLines} lines).", true);
 
-            return new ToolResult(string.Join("\n", resultLines));
+            var sb = new StringBuilder();
+            sb.AppendLine($"[Showing lines {startLine + 1} to {Math.Min(startLine + lineCount, totalLines)} of {totalLines} in {Path.GetFileName(path)}]");
+            sb.AppendLine("---");
+            foreach(var line in resultLines) sb.AppendLine(line);
+            
+            if (startLine + lineCount < totalLines)
+            {
+                sb.AppendLine("---");
+                sb.AppendLine($"[End of segment. There are {totalLines - (startLine + lineCount)} more lines. Use 'read_code' with startLine={startLine + lineCount} to read more.]");
+            }
+
+            return new ToolResult(sb.ToString());
         }
         catch (Exception ex)
         {
