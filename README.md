@@ -7,17 +7,19 @@ RimSearcher 是 一个 基于 Model Context Protocol (MCP) 构建的高性能服
 
 本项目专门针对 RimWorld 模组开发和源码研究而设计，利用 C# 14 和 .NET 10 的先进特性，结合 Roslyn 编译器平台，彻底解决了 LLM 因无法直接访问本地源码而导致的“知识盲区”和“幻觉”问题。
 
+> 该MCP服务器当前采用的是最新的MCP通讯协议 2025-11-25 版
+
 ---
 
 ## 1. 核心优势
 
 *   **深度集成 Roslyn**：不同于普通的文本搜索，RimSearcher 能够理解 C# 语法树，支持**精准提取方法体**、生成**类成员大纲**以及构建**继承链图谱**。
 *   **智能 XML 继承解析**：针对 RimWorld 复杂的 `ParentName` 继承系统，自动进行递归合并，返回 AI 能够直接理解的**最终生效 XML**。
+*   **语义桥接**：在解析 XML 的同时，自动识别关联的 `thingClass`、`compClass`、`workerClass` 等 C# 类型，并提供跳转建议
 *   **极速响应**：采用多线程内存预扫描机制，即使面对数万个文件的源码库，也能在毫秒级完成检索。
 *   **低 Token 损耗**：
     *   **按需提取**：支持仅提取特定的 C# 方法或 XML 节点，避免将数千行的无关代码塞进 AI 的上下文。
     *   **智能分页**：对于超长文件，支持按行读取和分页查看，保护 AI 的上下文窗口。
-*   **协议标准**：完全遵循 Anthropic 发布的 MCP 标准，无缝接入 Claude Desktop、Gemini CLI、Cursor 等支持 MCP 的 AI 工具。
 
 ---
 
@@ -25,30 +27,30 @@ RimSearcher 是 一个 基于 Model Context Protocol (MCP) 构建的高性能服
 
 RimSearcher 暴露了 6 个互补的工具，AI 会根据任务需求灵活调用：
 
-### ️ `rimworld-searcher__locate` (全域快速定位)
+#### ️ `rimworld-searcher__locate` (全域快速定位)
 *   **功能**：搜索入口。支持对 C# 类型名、XML DefName 或文件名进行模糊搜索。
 *   **价值**：当 AI 知道一个术语（如 `Hediff_Injury`）但不知道它在哪个文件时，此工具能瞬间提供准确的物理路径，为后续分析打下基础。
 
-###  `rimworld-searcher__inspect` (深度资源解析)
+####  `rimworld-searcher__inspect` (深度资源解析)
 这是本项目最核心的工具，包含两种模式：
 *   **XML 模式**：自动处理 `Abstract` 模板和 `ParentName` 继承，展示**解析后的最终 XML 属性**。同时自动识别关联的 `thingClass`、`workerClass` 等 C# 类，并提供其代码路径。
 *   **C# 模式**：自动生成类的 **Mermaid 继承关系图** 和**成员大纲**（方法、字段、属性列表）。让 AI 瞬间掌握类的结构，无需通读几千行代码。
 
-###  `rimworld-searcher__read_code` (智能源码提取)
+####  `rimworld-searcher__read_code` (智能源码提取)
 *   **功能**：支持通过 `methodName` 直接提取特定的 C# 方法实现（利用 Roslyn 解析）。若方法名不存在，会自动返回可用方法列表供 AI **自我修正**。
 *   **价值**：AI 往往只需要理解一个 `Tick()` 方法的逻辑。此工具直接返回该方法的闭合代码块，极大节省了 Token 并提高了逻辑理解的准确度。
 
-###  `rimworld-searcher__trace` (引用与继承追踪)
+####  `rimworld-searcher__trace` (引用与继承追踪)
 *   **功能**：
     *   `inheritors` 模式：查找所有继承自该类的子类（例如：查找所有的 `HediffComp` 实现）。
     *   `usages` 模式：在全库范围内查找特定符号（变量名、方法名）的所有引用位置。
 *   **价值**：用于分析代码的影响范围，寻找 Hook 点，或学习某种机制在游戏中的所有应用实例。
 
-###  `rimworld-searcher__search_regex` (全域正则搜索)
+####  `rimworld-searcher__search_regex` (全域正则搜索)
 *   **功能**：在全库范围内进行高级模式匹配。
 *   **价值**：适合寻找特定的硬编码字符串、特定的 XML 标签值，或复杂的代码模式。
 
-###  `rimworld-searcher__list_directory` (目录导航)
+####  `rimworld-searcher__list_directory` (目录导航)
 *   **功能**：浏览项目文件层级。
 *   **价值**：帮助 AI 理解源码的组织结构或 Data 目录的分层。
 
