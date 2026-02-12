@@ -2,6 +2,7 @@ using System.Collections.Concurrent;
 using System.Text.RegularExpressions;
 using System.Xml;
 using System.Xml.Linq;
+using System.Linq;
 
 namespace RimSearcher.Core;
 
@@ -125,17 +126,29 @@ public class DefIndexer
 
     public List<DefLocation> Search(string query)
     {
-        var results = new List<DefLocation>();
-        if (_defNameIndex.TryGetValue(query, out var loc1)) results.Add(loc1);
-        if (_parentNameIndex.TryGetValue(query, out var loc2)) results.Add(loc2);
-        var partialMatches = _defNameIndex.Where(kv => kv.Key.Contains(query, StringComparison.OrdinalIgnoreCase))
-            .Concat(_parentNameIndex.Where(kv => kv.Key.Contains(query, StringComparison.OrdinalIgnoreCase)))
-            .Take(30).Select(kv => kv.Value);
-        results.AddRange(partialMatches);
-        var labelMatches = _labelIndex.Where(kv => kv.Key.Contains(query, StringComparison.OrdinalIgnoreCase))
-            .SelectMany(kv => kv.Value).Take(20);
-        results.AddRange(labelMatches);
-        return results.GroupBy(x => $"{x.DefType}/{x.DefName}").Select(g => g.First()).Take(50).ToList();
+        var scoredResults = _defNameIndex
+            .Select(kv => new { Loc = kv.Value, Score = (double)CalculateScore(kv.Key, query) * 1.2 })
+            .Concat(_parentNameIndex.Select(kv => new { Loc = kv.Value, Score = (double)CalculateScore(kv.Key, query) }))
+            .Concat(_labelIndex.SelectMany(kv =>
+                kv.Value.Select(loc => new { Loc = loc, Score = (double)CalculateScore(kv.Key, query) * 0.8 })))
+            .Where(x => x.Score > 0)
+            .GroupBy(x => $"{x.Loc.DefType}/{x.Loc.DefName}")
+            .Select(g => g.OrderByDescending(x => x.Score).First())
+            .OrderByDescending(x => x.Score)
+            .ThenBy(x => x.Loc.DefName.Length)
+            .Take(50)
+            .Select(x => x.Loc)
+            .ToList();
+
+        return scoredResults;
+    }
+
+    private static int CalculateScore(string text, string query)
+    {
+        if (string.Equals(text, query, StringComparison.OrdinalIgnoreCase)) return 100;
+        if (text.StartsWith(query, StringComparison.OrdinalIgnoreCase)) return 70;
+        if (text.Contains(query, StringComparison.OrdinalIgnoreCase)) return 40;
+        return 0;
     }
 
     public DefLocation? GetDef(string name) => _defNameIndex.TryGetValue(name, out var loc)

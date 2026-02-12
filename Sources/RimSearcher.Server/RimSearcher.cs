@@ -132,7 +132,7 @@ public sealed class RimSearcher
                     serverInfo = new
                     {
                         name = "RimSearcher-Server",
-                        version = "2.2",
+                        version = "2.3",
                         description = "Specialized MCP server for deep RimWorld source code and XML Def analysis."
                     }
                 });

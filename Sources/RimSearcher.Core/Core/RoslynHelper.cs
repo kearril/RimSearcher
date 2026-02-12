@@ -7,7 +7,7 @@ namespace RimSearcher.Core;
 
 public static class RoslynHelper
 {
-    private const long MaxFileSize = 2 * 1024 * 1024; // 2MB
+    private const long MaxFileSize = 10 * 1024 * 1024; // 10MB
 
     public static Dictionary<string, string?> GetClassInheritanceMap(string path)
     {

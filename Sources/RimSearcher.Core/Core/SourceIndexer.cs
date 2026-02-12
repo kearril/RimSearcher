@@ -1,5 +1,6 @@
 using System.Collections.Concurrent;
 using System.Text.RegularExpressions;
+using System.Linq;
 
 namespace RimSearcher.Core;
 
@@ -162,12 +163,38 @@ public class SourceIndexer
         return new List<string>();
     }
 
-    public List<string> SearchTypes(string query) =>
-        _cachedAllTypeNames.Where(k => k.Contains(query, StringComparison.OrdinalIgnoreCase)).Take(20).ToList();
-
-    public List<string> Search(string query) =>
-        _index.Where(kv => kv.Key.Contains(query, StringComparison.OrdinalIgnoreCase)).SelectMany(kv => kv.Value)
+    public List<string> SearchTypes(string query)
+    {
+        return _cachedAllTypeNames
+            .Select(name => new { Name = name, Score = CalculateScore(name, query) })
+            .Where(x => x.Score > 0)
+            .OrderByDescending(x => x.Score)
+            .ThenBy(x => x.Name.Length)
+            .Take(20)
+            .Select(x => x.Name)
             .ToList();
+    }
+
+    public List<string> Search(string query)
+    {
+        return _index
+            .Select(kv => new { Key = kv.Key, Value = kv.Value, Score = CalculateScore(kv.Key, query) })
+            .Where(x => x.Score > 0)
+            .OrderByDescending(x => x.Score)
+            .ThenBy(x => x.Key.Length)
+            .SelectMany(x => x.Value)
+            .Distinct()
+            .Take(30)
+            .ToList();
+    }
+
+    private static int CalculateScore(string text, string query)
+    {
+        if (string.Equals(text, query, StringComparison.OrdinalIgnoreCase)) return 100;
+        if (text.StartsWith(query, StringComparison.OrdinalIgnoreCase)) return 70;
+        if (text.Contains(query, StringComparison.OrdinalIgnoreCase)) return 40;
+        return 0;
+    }
 
     public async Task<(List<(string Path, string Preview)> Results, bool Truncated)> SearchRegexAsync(
         string pattern,
