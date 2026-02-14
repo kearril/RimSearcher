@@ -14,7 +14,15 @@ public static class XmlInheritanceHelper
     {
         "comps", "stages", "modExtensions", "lifeStages", "hediffGivers", 
         "parts", "verbs", "tools", "abilities", "hediffFilters", "disallowedTraits",
-        "tags", "weaponTags", "apparelTags", "tradeTags", "thoughtContexts"
+        "tags", "weaponTags", "apparelTags", "tradeTags", "thoughtContexts",
+        "recipeUsers", "thingCategories", "researchPrerequisites", "skillRequirements",
+        "descriptionHyperlinks", "forcedTraits", "disallowedTraitsWithDegree", 
+        "nullifyingTraitDegrees", "agreeableTraits", "disagreeableTraits",
+        "disallowedThingDefs", "apparelRequired", "techHediffsRequired", "fixedInventory",
+        "requirementSet", "fixedIngredientFilter", "defaultIngredientFilter",
+        "requirementTags", "exclusionTags", "blacklistedGenders", "whiteListedGenders",
+        "hediffClassList", "requiredHediffs", "requiredGeneDefs", "disallowedGenes",
+        "startingResearchProjects", "addDesignators", "addDesignatorGroups"
     };
 
     public static async Task<string> ResolveDefXmlAsync(string defName, DefIndexer indexer)
@@ -116,7 +124,7 @@ public static class XmlInheritanceHelper
             foreach (var attr in child.Attributes().Where(a => a.Name.LocalName != "Inherit"))
                 parent.SetAttributeValue(attr.Name, attr.Value);
             foreach (var node in child.Nodes())
-                parent.Add(XNode.ReadFrom(node.CreateReader()));
+                parent.Add(node); 
             return;
         }
 

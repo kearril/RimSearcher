@@ -93,7 +93,11 @@ public class InspectTool : ITool
                     "traitWorkerClass", "selectionWorkerClass", "modExtension", "giverClass",
                     "soundClass", "damageWorkerClass", "linkDrawerClass", "graphicClass", 
                     "blueprintClass", "scattererClass", "questClass", "verbClass",
-                    "roomRoleWorker", "statWorker", "moteClass", "thinkTree"
+                    "roomRoleWorker", "statWorker", "moteClass", "thinkTree",
+                    "driverClass", "lordJob", "tabWindowClass", "pageClass", "comparerClass",
+                    "drawStyleType", "fleckSystemClass", "subEffecterClass", "needClass",
+                    "taleClass", "triggerClass", "inheritanceWorkerOverrideClass", "workerType",
+                    "eventClass", "worldDrawLayer", "designatorType", "scenPartClass", "stateClass"
                 };
 
                 var foundTypes = new HashSet<string>(StringComparer.OrdinalIgnoreCase);

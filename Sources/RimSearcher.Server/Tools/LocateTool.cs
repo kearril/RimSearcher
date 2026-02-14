@@ -68,7 +68,8 @@ public class LocateTool : ITool
             sb.AppendLine("\n## XML Defs (Data)");
             foreach (var def in defs.Take(10))
             {
-                sb.AppendLine($"- **{def.DefName}** ({def.DefType})");
+                var abstractTag = def.IsAbstract ? " [ABSTRACT]" : "";
+                sb.AppendLine($"- **{def.DefName}** ({def.DefType}){abstractTag}");
                 sb.AppendLine($"  - Path: `{def.FilePath}`");
                 if (!string.IsNullOrEmpty(def.Label)) sb.AppendLine($"  - Label: {def.Label}");
                 sb.AppendLine("  - Action: Use 'inspect' with this DefName for full resolved XML.");

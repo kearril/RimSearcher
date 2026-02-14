@@ -6,7 +6,7 @@ using System.Linq;
 
 namespace RimSearcher.Core;
 
-public record DefLocation(string FilePath, string DefType, string DefName, string? ParentName, string? Label);
+public record DefLocation(string FilePath, string DefType, string DefName, string? ParentName, string? Label, bool IsAbstract = false);
 
 public class DefIndexer
 {
@@ -72,6 +72,9 @@ public class DefIndexer
                         string defType = reader.LocalName;
                         string? nameAttr = reader.GetAttribute("Name");
                         string? parentNameAttr = reader.GetAttribute("ParentName");
+                        string? abstractAttr = reader.GetAttribute("Abstract");
+                        bool isAbstract = string.Equals(abstractAttr, "true", StringComparison.OrdinalIgnoreCase);
+
                         string? defName = null;
                         string? label = null;
 
@@ -91,7 +94,7 @@ public class DefIndexer
                         }
 
                         string identifier = defName ?? nameAttr ?? $"[Unnamed_{defType}_{nodeIdx}]";
-                        var loc = new DefLocation(file, defType, identifier, parentNameAttr, label);
+                        var loc = new DefLocation(file, defType, identifier, parentNameAttr, label, isAbstract);
 
                         if (!string.IsNullOrEmpty(defName)) _defNameIndex[defName] = loc;
                         if (!string.IsNullOrEmpty(nameAttr)) _parentNameIndex[nameAttr] = loc;
@@ -127,10 +130,10 @@ public class DefIndexer
     public List<DefLocation> Search(string query)
     {
         var scoredResults = _defNameIndex
-            .Select(kv => new { Loc = kv.Value, Score = (double)CalculateScore(kv.Key, query) * 1.2 })
-            .Concat(_parentNameIndex.Select(kv => new { Loc = kv.Value, Score = (double)CalculateScore(kv.Key, query) }))
+            .Select(kv => new { Loc = kv.Value, Score = (double)CalculateScore(kv.Key, query) * 1.2 * (kv.Value.IsAbstract ? 0.5 : 1.0) })
+            .Concat(_parentNameIndex.Select(kv => new { Loc = kv.Value, Score = (double)CalculateScore(kv.Key, query) * (kv.Value.IsAbstract ? 0.5 : 1.0) }))
             .Concat(_labelIndex.SelectMany(kv =>
-                kv.Value.Select(loc => new { Loc = loc, Score = (double)CalculateScore(kv.Key, query) * 0.8 })))
+                kv.Value.Select(loc => new { Loc = loc, Score = (double)CalculateScore(kv.Key, query) * 0.8 * (loc.IsAbstract ? 0.5 : 1.0) })))
             .Where(x => x.Score > 0)
             .GroupBy(x => $"{x.Loc.DefType}/{x.Loc.DefName}")
             .Select(g => g.OrderByDescending(x => x.Score).First())
