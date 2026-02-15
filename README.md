@@ -96,6 +96,8 @@ RimSearcher 暴露了 6 个互补的工具，AI 会根据任务需求灵活调�
 
 ## 5. 快速开始
 
+#### 点击跳转[B站视频教程](https://www.bilibili.com/video/BV1w1cJz7E9t?vd_source=624604839a08e42cea3a8cb45151b201)
+
 ### 前置要求
 *   安装 [.NET 10 SDK](https://dotnet.microsoft.com/download/dotnet/10.0)
 
