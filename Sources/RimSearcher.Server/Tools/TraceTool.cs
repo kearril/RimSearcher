@@ -64,7 +64,7 @@ public class TraceTool : ITool
         }
         else // usages mode
         {
-            var results = new ConcurrentBag<string>();
+            var results = new ConcurrentBag<(string file, int lineNum, string preview)>();
             var files = _sourceIndexer.GetAllFiles()
                 .Where(f => f.EndsWith(".cs") || f.EndsWith(".xml"))
                 .ToList();
@@ -93,14 +93,18 @@ public class TraceTool : ITool
                     using var reader = new StreamReader(stream);
 
                     string? line;
+                    int lineNum = 0;
                     while ((line = await reader.ReadLineAsync(ct)) != null)
                     {
+                        lineNum++;
                         if (regex.IsMatch(line))
                         {
                             var currentCount = Interlocked.Increment(ref globalCount);
                             if (currentCount <= 50)
                             {
-                                results.Add(file);
+                                var preview = line.Trim();
+                                if (preview.Length > 80) preview = preview.Substring(0, 77) + "...";
+                                results.Add((file, lineNum, preview));
                             }
                             if (currentCount >= 50)
                             {
@@ -123,11 +127,15 @@ public class TraceTool : ITool
 
             if (results.Count == 0) return new ToolResult($"No references to '{symbol}' found.");
 
-            var output = $"References to '{symbol}':\n" + string.Join(Environment.NewLine, results.Take(50).Select(r => $"- {r}"));
+            var sortedResults = results.OrderBy(r => r.file).ThenBy(r => r.lineNum).Take(50);
+            var output = $"References to '{symbol}' ({results.Count} found):\n\n" + 
+                         string.Join(Environment.NewLine, sortedResults.Select(r => 
+                             $"- `{System.IO.Path.GetFileName(r.file)}:{r.lineNum}` - {r.preview}"));
+            
             var wasTruncated = Interlocked.CompareExchange(ref truncatedFlag, 0, 0) == 1;
-            if (wasTruncated)
+            if (wasTruncated || results.Count > 50)
             {
-                output += $"\n\n[Truncated to 50 results]";
+                output += $"\n\n[Showing first 50 of {results.Count} matches]";
             }
 
             return new ToolResult(output);

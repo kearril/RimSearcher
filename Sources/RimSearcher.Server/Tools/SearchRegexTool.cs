@@ -47,11 +47,21 @@ public class SearchRegexTool : ITool
             var (results, truncated) = await _indexer.SearchRegexAsync(pattern, ignoreCase, cancellationToken, progress);
             if (results.Count == 0) return new ToolResult($"No matches for pattern: {pattern}");
 
-            var output = $"Regex matches for '{pattern}':\n\n" + 
-                         string.Join("\n\n", results.Select(r => $"`{r.Path}`\n{r.Preview}"));
+            // Group by file for compact display
+            var grouped = results.GroupBy(r => r.Path).Take(50);
+            
+            var output = $"Regex matches for '{pattern}' ({results.Count} found):\n\n" + 
+                         string.Join("\n\n", grouped.Select(g => 
+                         {
+                             var fileName = System.IO.Path.GetFileName(g.Key);
+                             var matches = g.Take(3).Select(m => "  " + m.Preview);
+                             var moreCount = g.Count() > 3 ? $"\n  ... +{g.Count() - 3} more in this file" : "";
+                             return $"`{fileName}`\n{string.Join("\n", matches)}{moreCount}";
+                         }));
+            
             if (truncated)
             {
-                output += "\n\n[Results truncated to 50 matches]";
+                output += "\n\n[Results limited to 50 files, use more specific pattern to narrow down]";
             }
 
             return new ToolResult(output);

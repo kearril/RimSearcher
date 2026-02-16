@@ -120,7 +120,8 @@ public class InspectTool : ITool
                 if (foundTypes.Count > 0)
                 {
                     sb.AppendLine("\n**Linked C# Types:**");
-                    foreach (var cls in foundTypes)
+                    var typesArray = foundTypes.Take(10).ToArray();
+                    foreach (var cls in typesArray)
                     {
                         var paths = _sourceIndexer.GetPathsByType(cls);
                         if (paths.Count > 0)
@@ -128,6 +129,8 @@ public class InspectTool : ITool
                         else
                             sb.AppendLine($"- `{cls}` (not indexed)");
                     }
+                    if (foundTypes.Count > 10)
+                        sb.AppendLine($"  ... +{foundTypes.Count - 10} more types (use locate to find them)");
                 }
             }
             catch

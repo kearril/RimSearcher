@@ -38,7 +38,7 @@ public class ReadCodeTool : ITool
             lineCount = new
             {
                 type = "integer",
-                description = "Optional: Number of lines to read. Defaults to 300."
+                description = "Optional: Number of lines to read. Defaults to 150."
             }
         },
         required = new[] { "path" }
@@ -73,7 +73,7 @@ public class ReadCodeTool : ITool
         }
 
         int startLine = args.TryGetProperty("startLine", out var sProp) ? sProp.GetInt32() : 0;
-        int lineCount = args.TryGetProperty("lineCount", out var lProp) ? lProp.GetInt32() : 300;
+        int lineCount = args.TryGetProperty("lineCount", out var lProp) ? lProp.GetInt32() : 150;
 
         try
         {
