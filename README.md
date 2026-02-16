@@ -3,15 +3,16 @@
 [![Total Downloads](https://img.shields.io/github/downloads/kearril/RimSearcher/total?style=flat-square&color=333&logo=github)](https://github.com/kearril/RimSearcher/releases)
 [![AI-Assisted](https://img.shields.io/badge/AI--Assisted-Gemini-333?style=flat-square&logo=google-gemini)](https://deepmind.google/technologies/gemini/)
 
-一个基于 MCP 的 RimWorld 源码智能检索分析服务。为 AI 助手（Claude、Gemini 等）赋能本地代码理解能力，彻底解决"知识盲区"和"幻觉"问题。
+一个基于 MCP 的 RimWorld 源码智能检索分析服务。为 AI 助手赋能本地代码理解能力，彻底解决"知识盲区"和"幻觉"问题。
 
-采用 Roslyn + 自定义 XML 继承解析引擎，毫秒级精准搜索 C# 代码和游戏配置，自动建立语义桥接。
+采用 Roslyn + 模拟 XML 继承解析引擎，毫秒级精准搜索 C# 代码和游戏配置，自动建立语义桥接。
+> MCP通讯协议版本: 2025-11-25
 
 ---
 
 ## 1. 核心特性
 
-🔍 **深度集成 Roslyn**  
+🔍 **集成 Roslyn**  
 真正理解 C# 语法树（AST），支持精准提取方法源代码、生成完整成员大纲、构建继承链图谱。
 
 🧩 **智能 XML 继承解析**  
@@ -31,9 +32,54 @@ N-gram 索引加速 + 候选集过滤，毫秒级搜索。即使数万个文件�
 ## 2. 六大工具
 
 #### 🔎 `locate` - 全域快速定位
-模糊搜索 C# 类型、XML Def、方法、字段。支持 `type:`、`method:`、`field:`、`def:` 过滤语法。
 
-**例**：`locate("Apparel_ShieldBelt")` 返回 ThingDef + 字段引用 + 内容匹配。
+**核心功能**：全库模糊搜索，一站式定位 C# 类型、XML Def、方法、字段、文件。支持过滤和组合查询。
+
+**支持的查询语法**：
+```
+Apparel_ShieldBelt           # 模糊搜索（自动 CamelCase、下划线转换）
+type:Comp                    # 仅搜索 C# 类型
+method:Tick                  # 仅搜索方法（可跨多个类）
+field:energy                 # 仅搜索字段
+def:Damage                   # 仅搜索 XML Def
+type:Comp method:Tick        # 组合查询（Comp 类中的 Tick 方法）
+```
+
+**智能匹配与评分算法**：
+```
+完全匹配 (100%)：DefName = "Apparel_ShieldBelt"
+前缀匹配 (90%)：DefName starts with "Shield"
+包含匹配 (70%)：DefName contains "belt"
+模糊匹配 (50%)：CamelCase "ASB" 匹配 "Apparel_ShieldBelt"
+编辑距离 (40%)："ShieldBelt" 与 "ShieldBald" 相似度 > 80%
+```
+
+- **N-gram 预索引**：初始化时构建 3-gram 索引，快速候选集过滤
+- **候选集限制**：最多 500 个候选，防止大规模结果集
+- **分类展示**：按 Members、XML Defs、Content Matches、Files 分类
+
+**输出示例** - 查询 `Apparel_ShieldBelt`：
+```
+## 'Apparel_ShieldBelt'
+
+**Members (完全匹配):**
+- Fields: RimWorld.ThingDefOf.Apparel_ShieldBelt (100%) - ThingDefOf.cs
+
+**XML Defs (按评分排序):**
+- Apparel_ShieldBelt (120%) - ThingDef "shield belt"  [完全匹配]
+- Apparel_SmokepopBelt (85%) - ThingDef "pop smoke"   [包含匹配]
+- Apparel_SimpleHelmet (78%) - ThingDef "simple..."   [编辑距离]
+... (8 more)
+
+**Content Matches:**
+- Mercenary_Slasher - PawnKindDef.apparelRequired
+- Apparel_ShieldBelt - ThingDef.defName
+```
+
+**性能特点**：
+- 典型查询 **< 10ms**（已预索引）
+- 复杂查询（type:+method:） **< 50ms**
+- 支持实时交互式搜索
 
 ---
 
