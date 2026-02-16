@@ -15,7 +15,7 @@ public class SearchRegexTool : ITool
     public string Name => "rimworld-searcher__search_regex";
 
     public string Description =>
-        "Regex pattern search across all C# and XML files. Use for finding specific XML tags (e.g., '<thingClass>Apparel</thingClass>'), method signatures, or data patterns. Returns file paths with matching line previews. Limit: 50 results.";
+        "Regex pattern search across all C# and XML files. Use for finding specific XML tags (e.g., '<thingClass>Apparel</thingClass>'), method signatures, or data patterns. Returns results grouped by file with line numbers and previews. Shows top 3 matches per file. Limit: 50 files.";
 
     public string? Icon => "lucide:search-code";
 

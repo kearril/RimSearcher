@@ -16,7 +16,7 @@ public class TraceTool : ITool
     public string Name => "rimworld-searcher__trace";
 
     public string Description =>
-        "Cross-reference analysis for C# and XML. Mode 'inheritors': finds all subclasses of a base type (e.g., all HediffComp variants). Mode 'usages': finds all files referencing a symbol. Useful for impact analysis and hook discovery.";
+        "Cross-reference analysis for C# and XML. Mode 'inheritors': finds all subclasses of a base type (e.g., all HediffComp variants). Mode 'usages': finds all files referencing a symbol with line numbers and code previews. Useful for impact analysis and hook discovery.";
 
     public string? Icon => "lucide:git-branch";
 

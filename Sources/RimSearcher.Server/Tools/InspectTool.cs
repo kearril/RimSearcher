@@ -19,7 +19,7 @@ public class InspectTool : ITool
     public string Name => "rimworld-searcher__inspect";
 
     public string Description =>
-        "Analyzes RimWorld defs and C# types. Resolves XML ParentName inheritance chains and exposes merged values. Extracts linked C# Worker/Comp classes from defs. Shows C# class outlines with inheritance graphs.";
+        "Analyzes RimWorld defs and C# types. Resolves XML ParentName inheritance chains and exposes merged values. Extracts linked C# Worker/Comp classes from defs (shows top 10). Shows C# class outlines with inheritance graphs.";
 
     public string? Icon => "lucide:eye";
 

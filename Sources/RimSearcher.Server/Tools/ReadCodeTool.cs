@@ -9,7 +9,7 @@ public class ReadCodeTool : ITool
     public string Name => "rimworld-searcher__read_code";
 
     public string Description =>
-        "Extracts C# source code from files. Provide 'methodName' to extract a specific method body (recommended). Or use 'startLine' and 'lineCount' for raw line-based reading. Essential for understanding implementation details of Comps, Workers, and game logic.";
+        "Extracts C# source code from files. Provide 'methodName' to extract a specific method body (recommended). Or use 'startLine' and 'lineCount' for raw line-based reading (defaults to 150 lines). Essential for understanding implementation details of Comps, Workers, and game logic.";
 
     public string? Icon => "lucide:file-code";
 

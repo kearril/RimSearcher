@@ -98,7 +98,7 @@ Members (method:Tick 的结果):
 
 #### 🔬 `inspect` - 深度资源分析（最核心）
 两种模式：
-- **XML 模式**：递归解析 ParentName 继承链，返回完全合并的最终 XML + 关联 C# 逻辑类
+- **XML 模式**：递归解析 ParentName 继承链，返回完全合并的最终 XML + 关联 C# 逻辑类（最多显示前 10 个）
 - **C# 模式**：生成类的完整成员大纲（方法、字段、属性）+ 继承关系图
 
 **例**：`inspect("Apparel_ShieldBelt")` 返回完整 ThingDef，包括 5 个组件（Shield、Colorable、Quality 等）。
@@ -106,7 +106,7 @@ Members (method:Tick 的结果):
 ---
 
 #### 📖 `read_code` - 智能源码提取
-按需精准提取 C# 方法体（不是整个文件）。方法不存在时自动返回可用方法列表。
+按需精准提取 C# 方法体（不是整个文件）。方法不存在时自动返回可用方法列表。默认读取 150 行。
 
 **例**：`read_code("PostPreApplyDamage")` 返回完整的伤害处理逻辑。
 
@@ -115,14 +115,14 @@ Members (method:Tick 的结果):
 #### 🔗 `trace` - 交叉引用追踪
 两种模式：
 - **inheritors**：找所有直接+间接继承的子类
-- **usages**：找特定符号（方法、字段、类名）的所有引用位置
+- **usages**：找特定符号（方法、字段、类名）的所有引用位置，显示行号和代码预览
 
-**例**：`trace("PostPreApplyDamage", "usages")` 返回 9 个调用位置。
+**例**：`trace("PostPreApplyDamage", "usages")` 返回 9 个调用位置及代码片段。
 
 ---
 
 #### 🔤 `search_regex` - 全域正则搜索
-在整个源码库内进行高级模式匹配（C# + XML），返回最多 50 个结果。
+在整个源码库内进行高级模式匹配（C# + XML），结果按文件分组，每文件显示前 3 个匹配（含行号和预览）。最多返回 50 个文件。
 
 **例**：`search_regex("<compClass>(.+?)</compClass>")` 提取所有 Comp 类定义。
 

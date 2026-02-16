@@ -62,7 +62,8 @@ public class LocateTool : ITool
                 {
                     var paths = _sourceIndexer.GetPathsByType(typeName);
                     var firstPath = paths.FirstOrDefault() ?? "unknown";
-                    sb.AppendLine($"- `{typeName}` ({score:F0}%) - {firstPath}");
+                    var fileName = Path.GetFileName(firstPath);
+                    sb.AppendLine($"- `{typeName}` ({score:F0}%) - {fileName}");
                 }
                 if (types.Count > 10)
                     sb.AppendLine($"  ... +{types.Count - 10} more");
@@ -87,12 +88,12 @@ public class LocateTool : ITool
                 foreach (var group in groupedMembers)
                 {
                     sb.AppendLine($"  {group.Key}s:");
-                    foreach (var (typeName, memberName, memberType, filePath, score) in group.Take(10))
+                    foreach (var (typeName, memberName, memberType, filePath, score) in group.Take(5))
                     {
                         sb.AppendLine($"  - `{typeName}.{memberName}` ({score:F0}%) - {Path.GetFileName(filePath)}");
                     }
-                    if (group.Count() > 10)
-                        sb.AppendLine($"    ... +{group.Count() - 10} more");
+                    if (group.Count() > 5)
+                        sb.AppendLine($"    ... +{group.Count() - 5} more");
                 }
             }
         }
