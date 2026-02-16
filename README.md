@@ -1,13 +1,11 @@
-# RimSearcher: RimWorld 源码检索分析 MCP 服务器
+# RimSearcher
 [![Latest Release](https://img.shields.io/github/v/release/kearril/RimSearcher?style=flat-square&color=333&logo=github)](https://github.com/kearril/RimSearcher/releases/latest)
 [![Total Downloads](https://img.shields.io/github/downloads/kearril/RimSearcher/total?style=flat-square&color=333&logo=github)](https://github.com/kearril/RimSearcher/releases)
 [![AI-Assisted](https://img.shields.io/badge/AI--Assisted-Gemini-333?style=flat-square&logo=google-gemini)](https://deepmind.google/technologies/gemini/)
 
-RimSearcher 是基于 Model Context Protocol (MCP) 构建的高性能源码检索服务器。为 AI 助手（Gemini、Claude 等）提供对 RimWorld 游戏源码（C#）和配置文件（XML）的高效检索与深度分析能力。
+一个基于 MCP 的 RimWorld 源码智能检索分析服务。为 AI 助手（Claude、Gemini 等）赋能本地代码理解能力，彻底解决"知识盲区"和"幻觉"问题。
 
-利用 C# 14 和 .NET 10 的先进特性，结合 Roslyn 编译器平台，彻底解决了 LLM 因无法直接访问本地源码而导致的"知识盲区"和"幻觉"问题。
-
-> MCP 通讯协议版本：2025-11-25
+采用 Roslyn + 自定义 XML 继承解析引擎，毫秒级精准搜索 C# 代码和游戏配置，自动建立语义桥接。
 
 ---
 
