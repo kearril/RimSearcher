@@ -57,29 +57,30 @@ RimSearcher 暴露了 **6 个互补的工具**，涵盖搜索、分析、提取�
 
 **支持的查询语法**：
 ```
-Apparel_ShieldBelt       # 模糊搜索 DefName（自动匹配 ShieldBelt、Shield_Belt、SB 等）
-type:Pawn                # 仅搜索 C# 类型
-method:OnAttack          # 仅搜索方法（可跨多个类）
+Apparel_ShieldBelt       # 模糊搜索 DefName（自动匹配 ShieldBelt、Shield_Belt 等）
+type:Comp                # 仅搜索 C# 类型
+method:Tick              # 仅搜索方法（可跨多个类）
 field:energy             # 仅搜索字段
 def:Damage               # 仅搜索 XML Def
 type:Comp method:Tick    # 组合查询（Comp 类中的 Tick 方法）
 ```
 
-**输出示例**：
+**真实输出示例** - 查询 `Apparel_ShieldBelt`：
 ```markdown
-## 'ShieldBelt'
-
-**C# Types:**
-- `Apparel` (95%) - CompProperties_Shield.cs
-- `Apparel_Meta` (88%) - Apparel.cs
-
-**XML Defs:**
-- `Apparel_ShieldBelt` (100%) - "Shield Belt"
-- `CompProperties_Shield` (92%) - CompShield.cs
+## 'Apparel_ShieldBelt'
 
 **Members:**
-- Methods: CompShield.PostPreApplyDamage (95%)
-- Fields: Shield_EnergyMax (87%)
+- Fields: RimWorld.ThingDefOf.Apparel_ShieldBelt (100%) - ThingDefOf.cs
+
+**XML Defs:**
+- `Apparel_ShieldBelt` (120%) - ThingDef "shield belt"
+- `Apparel_SmokepopBelt` (46%) - ThingDef "pop smoke"
+- `Apparel_SimpleHelmet` (43%) - ThingDef "simple helmet"
+  ... +8 more
+
+**Content Matches:**
+- `Mercenary_Slasher` - PawnKindDef.apparelRequired.li
+- `Apparel_ShieldBelt` - ThingDef.defName
 ```
 
 **价值**：当 AI 知道一个概念名称但不确定精确位置时，此工具瞬间定位并分类结果，为后续分析奠定基础。
@@ -99,21 +100,30 @@ type:Comp method:Tick    # 组合查询（Comp 类中的 Tick 方法）
 
 **输出示例（XML 模式）**：
 ```xml
-<Apparel_ShieldBelt>
+<ThingDef>
   <defName>Apparel_ShieldBelt</defName>
-  <label>Shield Belt</label>
+  <label>shield belt</label>
+  <description>A projectile-repulsion device. It will attempt to stop incoming projectiles...</description>
   <thingClass>Apparel</thingClass>
-  <!-- 来自 ApparelBase：-->
-  <layer>Shell</layer>
-  <!-- 来自该 Def：-->
+  <techLevel>Spacer</techLevel>
+  <statBases>
+    <MaxHitPoints>100</MaxHitPoints>
+    <EnergyShieldRechargeRate>0.13</EnergyShieldRechargeRate>
+    <EnergyShieldEnergyMax>1.1</EnergyShieldEnergyMax>
+    <Mass>3</Mass>
+  </statBases>
   <comps>
-    <li Class="CompProperties_Forbiddable" />  ← 继承自 ApparelBase
-    <li Class="CompProperties_Shield">         ← 新增
-      <compClass>RimWorld.CompShield</compClass>
-      <energyPerDamage>0.01</energyPerDamage>
-    </li>
+    <li Class="CompProperties_Forbiddable" />
+    <li><compClass>CompColorable</compClass></li>
+    <li><compClass>CompQuality</compClass></li>
+    <li Class="CompProperties_Styleable" />
+    <li Class="CompProperties_Shield" />  ← 关键的盾牌组件
   </comps>
-</Apparel_ShieldBelt>
+  <apparel>
+    <bodyPartGroups><li>Waist</li></bodyPartGroups>
+    <layers><li>Belt</li></layers>
+  </apparel>
+</ThingDef>
 ```
 
 **模式 B：C# 类结构分析**
@@ -123,17 +133,27 @@ type:Comp method:Tick    # 组合查询（Comp 类中的 Tick 方法）
 
 **输出示例（C# 模式）**：
 ```markdown
-## Class: RimWorld.CompShield : ThingComp
+## C# Type: RimWorld.CompShield
 
-**Inheritance Chain:**
-- CompShield → ThingComp → IExposable → ...
+**Inheritance:**
+CompShield → ThingComp
 
-**Members:**
-- Property: float Shield_Energy
-- Property: float Shield_EnergyMax
+**Outline** (D:/vs代码/Assembly-CSharp/RimWorld/CompShield.cs):
+- Property: CompProperties_Shield Props
+- Property: float EnergyMax
+- Property: float EnergyGainPerTick
+- Property: float Energy
+- Property: ShieldState ShieldState
+- Field: float energy
+- Field: int ticksToReset
+- Field: int lastKeepDisplayTick
+- Method: void PostExposeData()
+- Method: IEnumerable<Gizmo> CompGetWornGizmosExtra()
 - Method: void CompTick()
-- Method: void PostPreApplyDamage(DamageInfo dinfo, out float damageDealt)
+- Method: void PostPreApplyDamage(DamageInfo dinfo, bool absorbed)  ← 伤害处理
 - Method: void Break()
+- Method: void Reset()
+- Method: void Draw()
 ```
 
 **价值**：此工具一次性展现资源的全貌（数据+关联逻辑），AI 无需多次查询即可理解完整结构。
@@ -164,18 +184,27 @@ Method not found. Available methods:
 
 **输出示例**：
 ```csharp
-public override void PostPreApplyDamage(DamageInfo dinfo, out float damageDealt)
+public override void PostPreApplyDamage(ref DamageInfo dinfo, out bool absorbed)
 {
-    damageDealt = 0f;
-    if (!base.parent.Spawned)
+    absorbed = false;
+    if (this.ShieldState != ShieldState.Active || this.PawnOwner == null)
+      return;
+    if (dinfo.Def == DamageDefOf.EMP)
+    {
+      this.energy = 0.0f;
+      this.Break();  // EMP 直接击破
+    }
+    else
+    {
+      if (dinfo.Def.ignoreShields || !dinfo.Def.isRanged && !dinfo.Def.isExplosive)
         return;
-    
-    float absorbedDamage = Mathf.Min(dinfo.Amount, Shield_Energy);
-    Shield_Energy -= absorbedDamage;
-    dinfo.SetAmount(Mathf.Max(0f, dinfo.Amount - absorbedDamage));
-    
-    if (Shield_Energy <= 0f)
-        Break();
+      this.energy -= dinfo.Amount * this.Props.energyLossPerDamage;  // 扣除能量
+      if ((double) this.energy < 0.0)
+        this.Break();  // 能量耗尽
+      else
+        this.AbsorbedDamage(dinfo);
+      absorbed = true;
+    }
 }
 ```
 
@@ -204,16 +233,21 @@ public override void PostPreApplyDamage(DamageInfo dinfo, out float damageDealt)
 
 **模式 B：符号使用追踪 (usages)**
 - 在全库范围内查找特定符号（方法名、字段名、类名）的所有引用
-- 返回文件路径 + 行号 + 上下文片段
+- 返回文件路径
 - 支持模糊匹配
 
-**输出示例**：
+**输出示例** - 查询 `PostPreApplyDamage` 的所有引用：
 ```markdown
-**Usages of TakeDamage (145 total):**
-- Pawn.cs:2341: float damageDealt = thing.TakeDamage(dinfo);
-- CompShield.cs:89: dinfo.SetAmount(dinfo.Amount - Shield_Energy);
-- HealthComponent.cs:156: return TakeDamage(new DamageInfo(...));
-... (142 more)
+References to 'PostPreApplyDamage':
+- D:/vs代码/Assembly-CSharp/RimWorld/CompGasOnDamage.cs
+- D:/vs代码/Assembly-CSharp/RimWorld/Apparel.cs
+- D:/vs代码/Assembly-CSharp/RimWorld/CompProjectileInterceptor.cs
+- D:/vs代码/Assembly-CSharp/Verse/ThingWithComps.cs
+- D:/vs代码/Assembly-CSharp/RimWorld/CompDissolution.cs
+- D:/vs代码/Assembly-CSharp/RimWorld/CompExplosive.cs
+- D:/vs代码/Assembly-CSharp/RimWorld/CompMetalhorror.cs
+- D:/vs代码/Assembly-CSharp/RimWorld/CompShield.cs
+(9 total)
 ```
 
 **价值**：用于分析代码影响范围、寻找 Hook 点、或学习某机制在游戏中的应用实例。例如，想知道"哪些代码会触发伤害吸收"，此工具一次性列出所有相关位置。
@@ -330,51 +364,82 @@ RimSearcher 由 **7 个核心引擎** 和 **1 个 MCP 服务层** 组成，精�
 以 **"护盾腰带（Shield Belt）是如何工作的"** 为例：
 
 1.  **定位 Def** → `locate(query: "Apparel_ShieldBelt")`  
-    结果：`Defs/ThingDefs_Misc/Apparel_Belts.xml` 文件位置
+    结果：找到 ThingDef Apparel_ShieldBelt (120% 匹配度)，位置在 Core/Defs/ThingDefs_Misc/Apparel_Belts.xml
 
 2.  **解析 XML 继承** → `inspect(name: "Apparel_ShieldBelt")`  
-    结果：已解决继承链的完整 XML，包含所有父类属性 + 自身属性。AI 在 `<comps>` 中看到 `CompProperties_Shield`
+    结果：完整解析后的 XML，包含所有属性。关键发现：`<comps>` 包含 `<li Class="CompProperties_Shield" />` 和 `<li><compClass>CompColorable</compClass></li>` 等多个组件
 
-3.  **关联逻辑类** → `inspect(name: "CompProperties_Shield")`  
-    结果：确认关联的 C# 实现类为 `RimWorld.CompShield`
+3.  **关联逻辑类** → 在 Linked C# Types 中看到：
+    - `CompProperties_Shield` 
+    - `CompColorable`
+    - `CompQuality` 等
 
-4.  **类结构分析** → `inspect(name: "RimWorld.CompShield")`  
-    结果：类的成员大纲，发现 `PostPreApplyDamage()`（伤害吸收）和 `CompTick()`（能量回复）方法
+4.  **获取 C# 实现** → `inspect(name: "RimWorld.CompShield")`  
+    结果：类大纲显示 CompShield 继承自 ThingComp，有 20+ 个方法和属性，其中 `PostPreApplyDamage()` 是伤害处理的核心
 
-5.  **方法实现** → `read_code(path, methodName: "PostPreApplyDamage")`  
-    结果：AI 获取具体实现逻辑，看到能量扣除、判断条件和 `Break()` 调用
+5.  **提取关键逻辑** → `read_code(methodName: "PostPreApplyDamage")`  
+    结果：获取完整的方法源代码，看到：
+    - EMP 伤害直接导致 `Break()`
+    - 普通伤害扣除能量：`this.energy -= dinfo.Amount * this.Props.energyLossPerDamage`
+    - 能量耗尽时破坏
 
-**最终产出**：AI 基于真实源码生成准确的技术分析报告。
+**最终产出**：AI 完全理解护盾腰带的工作原理（XML 参数 + 逻辑实现），可以准确分析游戏机制。
 
 ### 场景 2：寻找所有继承实现（用于理解设计模式） 🔗
 
-例如，"所有继承自 `HediffComp` 的组件有哪些，分别做什么？"
+例如，"哪些 Comp 继承自 ThingComp，如何进行不同的工作？"
 
-1.  **定位基类** → `locate(query: "type:HediffComp")`  
-    结果：`HediffComp` 类路径
+1.  **定位基类** → `locate(query: "type:ThingComp")`  
+    结果：RimWorld.ThingComp 类路径
 
-2.  **查找所有继承者** → `trace(symbol: "HediffComp", mode: "inheritors")`  
-    结果：返回 25 个子类列表（HediffComp_Immunizable、HediffComp_Pain 等）
+2.  **查找直接继承者** → `trace(symbol: "ThingComp", mode: "inheritors")`  
+    结果：返回 CompShield、CompPower、CompGlower、CompArt、CompBook 等 20+ 个子类
 
-3.  **逐个分析** → 对每个子类调用 `inspect(name: "HediffComp_Xxx")`  
-    结果：各子类的功能和参数
+3.  **逐个分析** → 对关键子类调用 `inspect(name: "RimWorld.CompXxx")`  
+    - `CompShield`：能量盾防护（在 CompsShield.cs）
+    - `CompPower`：电力系统（在 CompPower.cs）
+    - `CompGlower`：光源（在 CompGlower.cs）
 
-**优势**：AI 一次性获得完整的继承体系，理解该架构的所有应用，而无需手动搜索每个子类。
+**真实结果示例**（从 locate 的 type:Comp 查询）：
+```
+Top matching Comp types:
+- Camp (93%) - RimWorld/Planet/Camp.cs
+- CompArt (90%) - RimWorld/CompArt.cs
+- CompBook (90%) - RimWorld/CompBook.cs
+- CompDrug (90%) - RimWorld/CompDrug.cs
+- CompPower (90%) - RimWorld/CompPower.cs
+- CompGlower (90%) - Verse/CompGlower.cs
+- CompShield (90%) - RimWorld/CompShield.cs
+  ... (15+ more)
+```
+
+**优势**：AI 一次性获得完整的继承体系，理解该架构的所有应用实例。
 
 ### 场景 3：追踪代码影响范围（用于改 mod 或 bug 修复） 🐛
 
-例如，"修改 `TakeDamage` 方法会影响哪些地方？"
+例如，"修改 `PostPreApplyDamage` 方法会影响哪些地方？"
 
-1.  **定位方法** → `locate(query: "method:TakeDamage")`  
-    结果：所有包含该方法的文件
+1.  **定位方法** → `locate(query: "method:PostPreApplyDamage")`  
+    结果：找到 CompShield.cs、Apparel.cs 等文件中的实现
 
-2.  **查找所有调用点** → `trace(symbol: "TakeDamage", mode: "usages")`  
-    结果：返回 145 个引用位置（行号 + 文件 + 上下文）
+2.  **查找所有调用点** → `trace(symbol: "PostPreApplyDamage", mode: "usages")`  
+    结果：返回 9 个引用文件：
+    ```
+    - CompGasOnDamage.cs
+    - Apparel.cs
+    - CompProjectileInterceptor.cs
+    - ThingWithComps.cs
+    - CompDissolution.cs
+    - CompExplosive.cs
+    - CompMetalhorror.cs
+    - ThingComp.cs (基类定义)
+    - CompShield.cs (实现)
+    ```
 
-3.  **检查关键调用** → 对高风险位置使用 `read_code` 查看上下文  
-    结果：确认哪些调用可能受影响
+3.  **风险分析** → 使用 `read_code` 检查高风险文件（如 ThingWithComps.cs）  
+    确认这是基类的调用点，任何继承者的 PostPreApplyDamage 都会被触发
 
-**优势**：AI 能快速定位所有风险点，帮助规划修复策略，避免意外破坏。
+**优势**：AI 能快速定位所有 9 个相关文件，识别风险点（基类调用 vs 子类实现），帮助规划修复策略，避免引入 bug。
 
 ---
 
