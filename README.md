@@ -39,47 +39,60 @@ N-gram 索引加速 + 候选集过滤，毫秒级搜索。即使数万个文件�
 ```
 Apparel_ShieldBelt           # 模糊搜索（自动 CamelCase、下划线转换）
 type:Comp                    # 仅搜索 C# 类型
-method:Tick                  # 仅搜索方法（可跨多个类）
+method:PostPreApplyDamage    # 仅搜索方法（可跨多个类）
 field:energy                 # 仅搜索字段
 def:Damage                   # 仅搜索 XML Def
-type:Comp method:Tick        # 组合查询（Comp 类中的 Tick 方法）
+type:Comp method:Tick        # 组合查询（同时搜索 Comp 类和 Tick 方法）
 ```
 
 **智能匹配与评分算法**：
 ```
-完全匹配 (100%)：DefName = "Apparel_ShieldBelt"
-前缀匹配 (90%)：DefName starts with "Shield"
-包含匹配 (70%)：DefName contains "belt"
-模糊匹配 (50%)：CamelCase "ASB" 匹配 "Apparel_ShieldBelt"
-编辑距离 (40%)："ShieldBelt" 与 "ShieldBald" 相似度 > 80%
+完全匹配 (100%+)：DefName = "Apparel_ShieldBelt" 或精确类名匹配
+包含匹配 (80-90%)：部分包含或接近（如 "Shield" 匹配 "CompShield"）
+前缀匹配 (80-90%)：名称前缀匹配
+模糊匹配 (50-80%)：CamelCase、下划线转换、编辑距离
 ```
 
-- **N-gram 预索引**：初始化时构建 3-gram 索引，快速候选集过滤
-- **候选集限制**：最多 500 个候选，防止大规模结果集
-- **分类展示**：按 Members、XML Defs、Content Matches、Files 分类
+**实现机制**：
+- **N-gram 预索引**：初始化时构建 3-gram 索引，加速候选集过滤
+- **候选集限制**：最多 500 个候选，防止大规模结果集污染
+- **分类展示**：按 C# Types、Members、XML Defs、Content Matches、Files 分类
+- **智能排序**：按评分从高到低，相同评分按字母序
 
-**输出示例** - 查询 `Apparel_ShieldBelt`：
+**真实输出示例** - 查询 `Apparel_ShieldBelt`：
 ```
-## 'Apparel_ShieldBelt'
+Members:
+- RimWorld.ThingDefOf.Apparel_ShieldBelt (100%) - ThingDefOf.cs
 
-**Members (完全匹配):**
-- Fields: RimWorld.ThingDefOf.Apparel_ShieldBelt (100%) - ThingDefOf.cs
+XML Defs:
+- Apparel_ShieldBelt (120%) - ThingDef "shield belt"
+- Apparel_SmokepopBelt (46%) - ThingDef "pop smoke"
+- Apparel_SimpleHelmet (43%) - ThingDef "simple helmet"
+... (11 more)
 
-**XML Defs (按评分排序):**
-- Apparel_ShieldBelt (120%) - ThingDef "shield belt"  [完全匹配]
-- Apparel_SmokepopBelt (85%) - ThingDef "pop smoke"   [包含匹配]
-- Apparel_SimpleHelmet (78%) - ThingDef "simple..."   [编辑距离]
-... (8 more)
-
-**Content Matches:**
-- Mercenary_Slasher - PawnKindDef.apparelRequired
+Content Matches:
+- Mercenary_Slasher - PawnKindDef.apparelRequired.li
 - Apparel_ShieldBelt - ThingDef.defName
+- TradersGuild_Slasher - PawnKindDef.apparelRequired.li
+```
+
+**查询示例** - `type:Comp method:Tick`：
+```
+C# Types (type:Comp 的结果):
+- Camp (93%) - D:/vs代码/Assembly-CSharp\RimWorld\Planet\Camp.cs
+- CompArt (90%) - D:/vs代码/Assembly-CSharp\RimWorld\CompArt.cs
+... (20+ more)
+
+Members (method:Tick 的结果):
+- Verse.Gene.Tick (100%)
+- RimWorld.WaterBodyTracker.Tick (100%)
+... (20+ more)
 ```
 
 **性能特点**：
-- 典型查询 **< 10ms**（已预索引）
-- 复杂查询（type:+method:） **< 50ms**
-- 支持实时交互式搜索
+- 典型查询 **< 10ms**（已预索引的单字段查询）
+- 复杂查询（type:+method:） **< 50ms**（组合多个过滤器）
+- 支持实时交互式搜索，毫秒级响应
 
 ---
 
