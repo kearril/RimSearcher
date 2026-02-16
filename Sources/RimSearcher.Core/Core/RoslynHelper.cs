@@ -7,7 +7,7 @@ namespace RimSearcher.Core;
 
 public static class RoslynHelper
 {
-    private const long MaxFileSize = 10 * 1024 * 1024; // 10MB
+    private const long MaxFileSize = 10 * 1024 * 1024;
 
     public static Dictionary<string, string?> GetClassInheritanceMap(string path)
     {
@@ -51,16 +51,13 @@ public static class RoslynHelper
             else if (parent is FileScopedNamespaceDeclarationSyntax fns) nameStack.Push(fns.Name.ToString());
             parent = parent.Parent;
         }
-
         return string.Join(".", nameStack);
     }
 
     public static async Task<string> GetClassOutlineAsync(string filePath, string? targetTypeName = null)
     {
         if (!File.Exists(filePath)) return "File not found.";
-
-        // Limit file size to prevent excessive memory usage during parsing.
-        if (new FileInfo(filePath).Length > MaxFileSize) return "File too large (over 2MB), skipping parsing.";
+        if (new FileInfo(filePath).Length > MaxFileSize) return "File too large, skipping parsing.";
 
         string code;
         using (var stream = new FileStream(filePath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite))
@@ -109,21 +106,16 @@ public static class RoslynHelper
                     method.ParameterList.Parameters.Select(p => $"{p.Type} {p.Identifier.Text}"));
                 sb.AppendLine($"  Method: {method.ReturnType} {method.Identifier.Text}({parameters})");
             }
-
             sb.AppendLine();
         }
 
-        return sb.Length > 0
-            ? sb.ToString()
-            : (targetTypeName != null
-                ? $"Type not found in file: {targetTypeName}"
-                : "No type definitions found in file.");
+        return sb.Length > 0 ? sb.ToString() : "No matching types found.";
     }
 
     public static async Task<string> GetMethodBodyAsync(string filePath, string methodName, string? typeName = null)
     {
         if (!File.Exists(filePath)) return "File not found.";
-        if (new FileInfo(filePath).Length > MaxFileSize) return "File too large (over 2MB), skipping parsing.";
+        if (new FileInfo(filePath).Length > MaxFileSize) return "File too large, skipping parsing.";
 
         string code;
         using (var stream = new FileStream(filePath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite))
@@ -136,8 +128,7 @@ public static class RoslynHelper
         var root = await tree.GetRootAsync();
 
         var methods = root.DescendantNodes().OfType<MethodDeclarationSyntax>();
-        var matches = methods.Where(m => m.Identifier.Text.Equals(methodName, StringComparison.OrdinalIgnoreCase))
-            .ToList();
+        var matches = methods.Where(m => m.Identifier.Text.Equals(methodName, StringComparison.OrdinalIgnoreCase)).ToList();
 
         if (!string.IsNullOrEmpty(typeName))
         {
@@ -151,20 +142,7 @@ public static class RoslynHelper
             }).ToList();
         }
 
-        if (matches.Count == 0)
-        {
-            var availableMethods = methods.Select(m => m.Identifier.Text).Distinct().OrderBy(n => n).ToList();
-            var sbErr = new StringBuilder();
-            sbErr.AppendLine($"Method '{methodName}' not found.");
-            if (availableMethods.Count > 0)
-            {
-                sbErr.AppendLine("\nAvailable methods in this file:");
-                foreach (var mName in availableMethods) sbErr.AppendLine($"- {mName}");
-                sbErr.AppendLine("\nHint: Choose one of the method names above and call 'read_code' again.");
-            }
-
-            return sbErr.ToString();
-        }
+        if (matches.Count == 0) return $"Method '{methodName}' not found.";
 
         if (matches.Count == 1)
         {
@@ -174,7 +152,7 @@ public static class RoslynHelper
         }
 
         var sb = new StringBuilder();
-        sb.AppendLine($"/* Found {matches.Count} matching method overloads or conflicts */");
+        sb.AppendLine($"/* Found {matches.Count} matching method overloads */");
         foreach (var m in matches)
         {
             var lineSpan = m.GetLocation().GetLineSpan();
@@ -184,7 +162,43 @@ public static class RoslynHelper
             sb.AppendLine(m.ToFullString());
             sb.AppendLine("\n// --- NEXT MATCH ---\n");
         }
-
         return sb.ToString();
+    }
+
+    public static List<(string TypeName, string MemberName, string MemberType)> ExtractAllMembers(string filePath)
+    {
+        var result = new List<(string TypeName, string MemberName, string MemberType)>();
+        try
+        {
+            if (!File.Exists(filePath) || new FileInfo(filePath).Length > MaxFileSize) return result;
+
+            using var stream = new FileStream(filePath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
+            using var reader = new StreamReader(stream);
+            var code = reader.ReadToEnd();
+
+            var tree = CSharpSyntaxTree.ParseText(code);
+            var root = tree.GetCompilationUnitRoot();
+
+            foreach (var type in root.DescendantNodes().OfType<TypeDeclarationSyntax>())
+            {
+                var typeName = GetFullTypeName(type);
+                foreach (var method in type.Members.OfType<MethodDeclarationSyntax>())
+                    result.Add((typeName, method.Identifier.Text, "Method"));
+                foreach (var prop in type.Members.OfType<PropertyDeclarationSyntax>())
+                    result.Add((typeName, prop.Identifier.Text, "Property"));
+                foreach (var field in type.Members.OfType<FieldDeclarationSyntax>())
+                {
+                    foreach (var variable in field.Declaration.Variables)
+                        result.Add((typeName, variable.Identifier.Text, "Field"));
+                }
+                foreach (var evt in type.Members.OfType<EventFieldDeclarationSyntax>())
+                {
+                    foreach (var variable in evt.Declaration.Variables)
+                        result.Add((typeName, variable.Identifier.Text, "Event"));
+                }
+            }
+        }
+        catch { }
+        return result;
     }
 }

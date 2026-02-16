@@ -19,7 +19,7 @@ public class InspectTool : ITool
     public string Name => "rimworld-searcher__inspect";
 
     public string Description =>
-        "The ultimate analyzer for RimWorld's complex data-code links. Crucial for XML analysis as it automatically resolves `ParentName` inheritance—a process the AI model's internal knowledge cannot accurately perform. It exposes final merged values and identifies the exact C# Worker/Comp classes bound to a Def. Also provides C# class outlines and inheritance graphs.";
+        "Analyzes RimWorld defs and C# types. Resolves XML ParentName inheritance chains and exposes merged values. Extracts linked C# Worker/Comp classes from defs. Shows C# class outlines with inheritance graphs.";
 
     public string? Icon => "lucide:eye";
 
@@ -46,33 +46,30 @@ public class InspectTool : ITool
 
         var sb = new StringBuilder();
 
-        //  Try to resolve as a Def first.
         var def = _defIndexer.GetDef(name);
         if (def != null)
         {
-            sb.AppendLine($"# Def Analysis: {name}");
-            sb.AppendLine($"- **Type**: {def.DefType}");
-            
-            //  Semantic Bridge (Def Tag -> C# Class)
+            sb.AppendLine($"## Def: {name}");
+            sb.AppendLine($"Type: {def.DefType}");
+
             var typePaths = _sourceIndexer.GetPathsByType(def.DefType);
             if (typePaths.Count > 0)
-                sb.AppendLine($"- **Handling C# Class**: `{def.DefType}` in `{string.Join(", ", typePaths.Select(Path.GetFileName))}`");
+                sb.AppendLine($"C# Class: `{def.DefType}` ({string.Join(", ", typePaths.Select(Path.GetFileName))})");
 
-            sb.AppendLine($"- **Source File**: `{def.FilePath}`");
+            sb.AppendLine($"File: `{def.FilePath}`");
 
             var resolvedXmlStr = await XmlInheritanceHelper.ResolveDefXmlAsync(name, _defIndexer);
-            sb.AppendLine("\n## Resolved XML (with Inheritance)");
-            sb.AppendLine("> This shows the final merged values after inheritance resolution.");
-            
+            sb.AppendLine("\n**Resolved XML:**");
+
             var xmlLines = resolvedXmlStr.Split('\n');
             if (xmlLines.Length > 300)
             {
                 sb.AppendLine("```xml");
                 for (int i = 0; i < 200; i++) sb.AppendLine(xmlLines[i]);
-                sb.AppendLine($"\n<!-- ... [TRUNCATED {xmlLines.Length - 250} LINES FOR CONTEXT SAFETY] ... -->\n");
+                sb.AppendLine($"\n... [Truncated {xmlLines.Length - 250} lines] ...\n");
                 for (int i = xmlLines.Length - 50; i < xmlLines.Length; i++) sb.AppendLine(xmlLines[i]);
                 sb.AppendLine("```");
-                sb.AppendLine($"> *Note: The XML is very long ({xmlLines.Length} lines). Only the head and tail are shown. Use 'read_code' on the Source File listed above if you need the full content.*");
+                sb.AppendLine($"(Full XML: {xmlLines.Length} lines, use read_code on file path above)");
             }
             else
             {
@@ -81,7 +78,6 @@ public class InspectTool : ITool
                 sb.AppendLine("```");
             }
 
-            // Semantic Bridge (Comps, Workers, and Attributes -> C# Classes)
             try
             {
                 var xdoc = XDocument.Parse(resolvedXmlStr);
@@ -91,7 +87,7 @@ public class InspectTool : ITool
                     "compClass", "incidentClass", "interactionWorkerClass", "mentalStateHandlerClass",
                     "ritualBehaviorClass", "skillGiverClass", "worldObjectClass", "lifeStageWorkerClass",
                     "traitWorkerClass", "selectionWorkerClass", "modExtension", "giverClass",
-                    "soundClass", "damageWorkerClass", "linkDrawerClass", "graphicClass", 
+                    "soundClass", "damageWorkerClass", "linkDrawerClass", "graphicClass",
                     "blueprintClass", "scattererClass", "questClass", "verbClass",
                     "roomRoleWorker", "statWorker", "moteClass", "thinkTree",
                     "driverClass", "lordJob", "tabWindowClass", "pageClass", "comparerClass",
@@ -104,9 +100,8 @@ public class InspectTool : ITool
                 foreach (var el in xdoc.Descendants())
                 {
                     cancellationToken.ThrowIfCancellationRequested();
-                    
-                    // Specific tags known to hold class names
-                    if (classTags.Contains(el.Name.LocalName) || 
+
+                    if (classTags.Contains(el.Name.LocalName) ||
                         el.Name.LocalName.EndsWith("Class", StringComparison.OrdinalIgnoreCase) ||
                         el.Name.LocalName.EndsWith("Worker", StringComparison.OrdinalIgnoreCase))
                     {
@@ -114,7 +109,6 @@ public class InspectTool : ITool
                         if (!string.IsNullOrEmpty(val)) foundTypes.Add(val);
                     }
 
-                    // 'Class' attributes used for polymorphism (Comps, HediffComps, etc.)
                     var classAttr = el.Attribute("Class");
                     if (classAttr != null)
                     {
@@ -125,35 +119,33 @@ public class InspectTool : ITool
 
                 if (foundTypes.Count > 0)
                 {
-                    sb.AppendLine("\n## Linked C# Types (Logic & Comps)");
+                    sb.AppendLine("\n**Linked C# Types:**");
                     foreach (var cls in foundTypes)
                     {
                         var paths = _sourceIndexer.GetPathsByType(cls);
                         if (paths.Count > 0)
-                            sb.AppendLine($"- **{cls}**: `{string.Join(", ", paths.Select(Path.GetFileName))}` - Use 'read_code' to see implementation.");
+                            sb.AppendLine($"- `{cls}` ({string.Join(", ", paths.Select(Path.GetFileName))})");
                         else
-                            sb.AppendLine($"- **{cls}** (Type not found in current source indexing)");
+                            sb.AppendLine($"- `{cls}` (not indexed)");
                     }
                 }
             }
             catch
             {
-                // XML parsing failed or no classes found, silent skip
             }
 
             return new ToolResult(sb.ToString());
         }
 
-        //  Try to resolve as a C# Type.
         var csharpPaths = _sourceIndexer.GetPathsByType(name);
         if (csharpPaths.Count > 0)
         {
-            sb.AppendLine($"# C# Type Analysis: {name}");
+            sb.AppendLine($"## C# Type: {name}");
 
             var chain = _sourceIndexer.GetInheritanceChain(name);
             if (chain.Count > 0)
             {
-                sb.AppendLine("\n## Inheritance Graph");
+                sb.AppendLine("\n**Inheritance:**");
                 sb.AppendLine("```mermaid\ngraph TD");
                 foreach (var (child, parent) in chain) sb.AppendLine($"    {child} --> {parent}");
                 sb.AppendLine("```\n");
@@ -162,7 +154,7 @@ public class InspectTool : ITool
             foreach (var path in csharpPaths)
             {
                 cancellationToken.ThrowIfCancellationRequested();
-                sb.AppendLine($"## Outline (File: `{path}`)");
+                sb.AppendLine($"**Outline** (`{path}`):");
                 sb.AppendLine(await RoslynHelper.GetClassOutlineAsync(path, name));
                 sb.AppendLine("---");
             }
@@ -171,7 +163,7 @@ public class InspectTool : ITool
         }
 
         return new ToolResult(
-            $"Resource '{name}' not found. Tips: 1. If you aren't sure of the exact name, use 'locate' tool first. 2. Remember that class names are case-sensitive.",
+            $"'{name}' not found. Use locate tool first to find exact names (case-sensitive).",
             true);
     }
 }

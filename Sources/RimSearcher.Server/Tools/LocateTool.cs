@@ -19,7 +19,7 @@ public class LocateTool : ITool
     public string Name => "rimworld-searcher__locate";
 
     public string Description =>
-        "The mandatory entry point for any RimWorld analysis. Instantly maps a DefName, C# Type, or filename to its physical disk path across Core and all active Mods. Use this tool first whenever the target file path is unknown to ensure subsequent tools have the correct file context.";
+        "Fuzzy search for RimWorld C# classes, methods, fields, and XML defs. Supports typo tolerance, CamelCase shortcuts (e.g., 'JDW' → 'JobDriver_Wait'), and query filters (type:, method:, field:, def:). Primary tool for locating code elements.";
 
     public string? Icon => "lucide:map-pin";
 
@@ -40,60 +40,124 @@ public class LocateTool : ITool
 
     public async Task<ToolResult> ExecuteAsync(JsonElement args, CancellationToken cancellationToken, IProgress<double>? progress = null)
     {
-        var query = args.GetProperty("query").GetString();
-        if (string.IsNullOrEmpty(query)) return new ToolResult("Query cannot be empty.", true);
+        var rawQuery = args.GetProperty("query").GetString();
+        if (string.IsNullOrEmpty(rawQuery)) return new ToolResult("Query cannot be empty.", true);
 
         cancellationToken.ThrowIfCancellationRequested();
 
+        var query = QueryParser.Parse(rawQuery);
+
         var sb = new StringBuilder();
-        sb.AppendLine($"# Search Results for: '{query}'");
+        sb.AppendLine($"## '{rawQuery}'");
 
-        // 1. Fuzzy matching for Types
-        var types = _sourceIndexer.SearchTypes(query);
-        if (types.Any())
+        if (query.TypeFilter != null || (string.IsNullOrEmpty(query.MethodFilter) && string.IsNullOrEmpty(query.FieldFilter) && string.IsNullOrEmpty(query.DefFilter)))
         {
-            sb.AppendLine("\n## C# Types (Code)");
-            foreach (var cls in types.Take(10))
+            var typeSearchTerm = query.TypeFilter ?? QueryParser.GetCombinedSearchTerm(query);
+            var types = _sourceIndexer.FuzzySearchTypes(typeSearchTerm);
+
+            if (types.Any())
             {
-                var paths = _sourceIndexer.GetPathsByType(cls);
-                sb.AppendLine($"- **{cls}**\n  - Paths: `{string.Join(", ", paths)}` - Hint: Use 'read_code' with these paths.");
+                sb.AppendLine("\n**C# Types:**");
+                foreach (var (typeName, score) in types.Take(10))
+                {
+                    var paths = _sourceIndexer.GetPathsByType(typeName);
+                    var firstPath = paths.FirstOrDefault() ?? "unknown";
+                    sb.AppendLine($"- `{typeName}` ({score:F0}%) - {firstPath}");
+                }
+                if (types.Count > 10)
+                    sb.AppendLine($"  ... +{types.Count - 10} more");
             }
-            if (types.Count > 10) sb.AppendLine($"*... ({types.Count - 10} more types omitted)*");
         }
 
-        // 2. Fuzzy matching for Defs
-        var defs = _defIndexer.Search(query);
-        if (defs.Any())
+        if (query.MethodFilter != null || query.FieldFilter != null || query.Keywords.Any())
         {
-            sb.AppendLine("\n## XML Defs (Data)");
-            foreach (var def in defs.Take(10))
+            var keywords = new List<string>();
+            if (query.MethodFilter != null) keywords.Add(query.MethodFilter);
+            if (query.FieldFilter != null) keywords.Add(query.FieldFilter);
+            keywords.AddRange(query.Keywords);
+
+            var members = _sourceIndexer.SearchMembersByKeywords(keywords.ToArray());
+
+            if (members.Any())
             {
-                var abstractTag = def.IsAbstract ? " [ABSTRACT]" : "";
-                sb.AppendLine($"- **{def.DefName}** ({def.DefType}){abstractTag}");
-                sb.AppendLine($"  - Path: `{def.FilePath}`");
-                if (!string.IsNullOrEmpty(def.Label)) sb.AppendLine($"  - Label: {def.Label}");
-                sb.AppendLine("  - Action: Use 'inspect' with this DefName for full resolved XML.");
+                sb.AppendLine("\n**Members:**");
+
+                var groupedMembers = members.GroupBy(m => m.MemberType).ToList();
+
+                foreach (var group in groupedMembers)
+                {
+                    sb.AppendLine($"  {group.Key}s:");
+                    foreach (var (typeName, memberName, memberType, filePath, score) in group.Take(10))
+                    {
+                        sb.AppendLine($"  - `{typeName}.{memberName}` ({score:F0}%) - {Path.GetFileName(filePath)}");
+                    }
+                    if (group.Count() > 10)
+                        sb.AppendLine($"    ... +{group.Count() - 10} more");
+                }
             }
-            if (defs.Count > 10) sb.AppendLine($"*... ({defs.Count - 10} more Defs omitted)*");
         }
 
-        // 3. Fuzzy matching for filenames
-        var files = _sourceIndexer.Search(query).Distinct().ToList();
-        if (files.Any())
+        if (query.DefFilter != null || (string.IsNullOrEmpty(query.TypeFilter) && string.IsNullOrEmpty(query.MethodFilter) && string.IsNullOrEmpty(query.FieldFilter)))
         {
-            sb.AppendLine("\n## Matching Files");
+            var defSearchTerm = query.DefFilter ?? QueryParser.GetCombinedSearchTerm(query);
+            var defs = _defIndexer.FuzzySearch(defSearchTerm);
+
+            if (defs.Any())
+            {
+                sb.AppendLine("\n**XML Defs:**");
+                foreach (var (def, score) in defs.Take(10))
+                {
+                    var abstractTag = def.IsAbstract ? " [Abstract]" : "";
+                    var label = !string.IsNullOrEmpty(def.Label) ? $" \"{def.Label}\"" : "";
+                    sb.AppendLine($"- `{def.DefName}` ({score:F0}%) - {def.DefType}{abstractTag}{label}");
+                }
+                if (defs.Count > 10)
+                    sb.AppendLine($"  ... +{defs.Count - 10} more");
+            }
+
+            if (query.Keywords.Any())
+            {
+                var defsByContent = _defIndexer.SearchByContent(query.Keywords.ToArray());
+
+                if (defsByContent.Any())
+                {
+                    sb.AppendLine("\n**Content Matches:**");
+
+                    foreach (var (location, matchedFields) in defsByContent.Take(10))
+                    {
+                        var fieldSummary = string.Join(", ", matchedFields.Take(3));
+                        var moreFields = matchedFields.Count > 3 ? $" +{matchedFields.Count - 3}" : "";
+                        sb.AppendLine($"- `{location.DefName}` - {fieldSummary}{moreFields}");
+                    }
+                    if (defsByContent.Count > 10)
+                        sb.AppendLine($"  ... +{defsByContent.Count - 10} more");
+                }
+            }
+        }
+
+        var files = _sourceIndexer.Search(rawQuery).Distinct().ToList();
+        if (files.Any() && files.Count <= 10)
+        {
+            sb.AppendLine("\n**Files:**");
             foreach (var file in files.Take(10))
             {
-                sb.AppendLine($"- `{file}`");
+                sb.AppendLine($"- {Path.GetFileName(file)} - {file}");
             }
-            if (files.Count > 10) sb.AppendLine($"*... ({files.Count - 10} more files omitted)*");
+            if (files.Count > 10)
+                sb.AppendLine($"  ... +{files.Count - 10} more");
         }
 
         var result = sb.ToString();
-        if (string.IsNullOrWhiteSpace(result) || result.Split('\n').Length <= 2)
+
+        var resultLines = result.Split('\n').Where(l => !string.IsNullOrWhiteSpace(l)).ToList();
+        if (resultLines.Count <= 1)
         {
-            return new ToolResult($"No resources found matching '{query}'.\nTips:\n1. Try a partial name.\n2. Use 'search_regex' for content inside files.", true);
+            return new ToolResult(
+                $"No results for '{rawQuery}'.\n\n" +
+                "Try: partial names, query filters (type:, method:, field:, def:), or search_regex for patterns.",
+                true);
         }
+
         return new ToolResult(result);
     }
 }

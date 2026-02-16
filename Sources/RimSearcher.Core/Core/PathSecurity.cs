@@ -12,11 +12,10 @@ public static class PathSecurity
         {
             if (string.IsNullOrEmpty(path)) continue;
 
-            // Normalize the path and remove trailing slashes to ensure accurate prefix matching.
-            var fullPath = Path.GetFullPath(path).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
-            if (!AllowedRoots.Contains(fullPath, StringComparer.OrdinalIgnoreCase))
+            var resolvedPath = ResolvePath(path);
+            if (resolvedPath != null && !AllowedRoots.Contains(resolvedPath, StringComparer.OrdinalIgnoreCase))
             {
-                AllowedRoots.Add(fullPath);
+                AllowedRoots.Add(resolvedPath);
             }
         }
     }
@@ -27,19 +26,18 @@ public static class PathSecurity
 
         try
         {
-            var fullPath = Path.GetFullPath(requestedPath);
+            var resolvedPath = ResolvePath(requestedPath);
+            if (resolvedPath == null) return false;
 
             return AllowedRoots.Any(root =>
             {
-                // 1. Exact match
-                if (fullPath.Equals(root, StringComparison.OrdinalIgnoreCase)) return true;
+                if (resolvedPath.Equals(root, StringComparison.OrdinalIgnoreCase)) return true;
 
-                // 2. Subdirectory match 
                 var rootWithSlash = root + Path.DirectorySeparatorChar;
-                if (fullPath.StartsWith(rootWithSlash, StringComparison.OrdinalIgnoreCase)) return true;
+                if (resolvedPath.StartsWith(rootWithSlash, StringComparison.OrdinalIgnoreCase)) return true;
 
                 var rootWithAltSlash = root + Path.AltDirectorySeparatorChar;
-                if (fullPath.StartsWith(rootWithAltSlash, StringComparison.OrdinalIgnoreCase)) return true;
+                if (resolvedPath.StartsWith(rootWithAltSlash, StringComparison.OrdinalIgnoreCase)) return true;
 
                 return false;
             });
@@ -50,10 +48,41 @@ public static class PathSecurity
         }
     }
 
-    public static string ValidateAndGetPath(string requestedPath)
+    private static string? ResolvePath(string path)
     {
-        if (IsPathSafe(requestedPath)) return requestedPath;
-        throw new UnauthorizedAccessException(
-            $"Access Denied: Path {requestedPath} is not within the allowed source directories.");
+        try
+        {
+            var fullPath = Path.GetFullPath(path);
+
+            if (File.Exists(fullPath))
+            {
+                var fileInfo = new FileInfo(fullPath);
+                if ((fileInfo.Attributes & FileAttributes.ReparsePoint) != 0)
+                {
+                    return null;
+                }
+                fullPath = fileInfo.FullName;
+            }
+            else if (Directory.Exists(fullPath))
+            {
+                var dirInfo = new DirectoryInfo(fullPath);
+                if ((dirInfo.Attributes & FileAttributes.ReparsePoint) != 0)
+                {
+                    return null;
+                }
+                fullPath = dirInfo.FullName;
+            }
+
+            if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+            {
+                fullPath = fullPath.Replace(Path.AltDirectorySeparatorChar, Path.DirectorySeparatorChar);
+            }
+
+            return fullPath.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+        }
+        catch
+        {
+            return null;
+        }
     }
 }

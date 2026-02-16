@@ -5,18 +5,15 @@ namespace RimSearcher.Core;
 
 public static class XmlInheritanceHelper
 {
-    // Configure XML reader settings to prohibit DTD processing, defending against potential XXE attacks.
     private static readonly XmlReaderSettings SafeSettings = new() { DtdProcessing = DtdProcessing.Prohibit };
 
-    // Common RimWorld XML tags that act as list containers. 
-    // Children of these tags should be appended rather than merged.
     private static readonly HashSet<string> ListContainerNames = new(StringComparer.OrdinalIgnoreCase)
     {
-        "comps", "stages", "modExtensions", "lifeStages", "hediffGivers", 
+        "comps", "stages", "modExtensions", "lifeStages", "hediffGivers",
         "parts", "verbs", "tools", "abilities", "hediffFilters", "disallowedTraits",
         "tags", "weaponTags", "apparelTags", "tradeTags", "thoughtContexts",
         "recipeUsers", "thingCategories", "researchPrerequisites", "skillRequirements",
-        "descriptionHyperlinks", "forcedTraits", "disallowedTraitsWithDegree", 
+        "descriptionHyperlinks", "forcedTraits", "disallowedTraitsWithDegree",
         "nullifyingTraitDegrees", "agreeableTraits", "disagreeableTraits",
         "disallowedThingDefs", "apparelRequired", "techHediffsRequired", "fixedInventory",
         "requirementSet", "fixedIngredientFilter", "defaultIngredientFilter",
@@ -76,17 +73,14 @@ public static class XmlInheritanceHelper
         XElement result = new XElement(hierarchy.Peek().Name);
         while (hierarchy.Count > 0) MergeXml(result, hierarchy.Pop());
 
-        // Ensure defName, label and description are at the top for better readability
         var defNameEl = result.Element("defName");
         var labelEl = result.Element("label");
         var descEl = result.Element("description");
-        
-        // Remove them first
+
         defNameEl?.Remove();
         labelEl?.Remove();
         descEl?.Remove();
 
-        // Add them back in reverse order of priority to ensure: defName, then label, then description
         if (descEl != null) result.AddFirst(descEl);
         if (labelEl != null) result.AddFirst(labelEl);
         if (defNameEl != null) result.AddFirst(defNameEl);
@@ -97,12 +91,11 @@ public static class XmlInheritanceHelper
 
     private static void CleanupMetadata(XElement element)
     {
-        // Only remove 'Name' if 'defName' element exists, to keep identity for abstract defs.
         if (element.Element("defName") != null)
         {
             element.Attribute("Name")?.Remove();
         }
-        
+
         element.Attribute("ParentName")?.Remove();
         element.Attribute("Abstract")?.Remove();
         element.Attribute("Inherit")?.Remove();
@@ -115,7 +108,6 @@ public static class XmlInheritanceHelper
 
     private static void MergeXml(XElement parent, XElement child)
     {
-        // Handle Inherit="false": completely detach from parent.
         bool inherit = child.Attribute("Inherit")?.Value.ToLower() != "false";
         if (!inherit)
         {
@@ -124,16 +116,14 @@ public static class XmlInheritanceHelper
             foreach (var attr in child.Attributes().Where(a => a.Name.LocalName != "Inherit"))
                 parent.SetAttributeValue(attr.Name, attr.Value);
             foreach (var node in child.Nodes())
-                parent.Add(node); 
+                parent.Add(node);
             return;
         }
 
-        // Attribute handling: child attributes replace parent attributes (standard RimWorld behavior).
         parent.RemoveAttributes();
         foreach (var attr in child.Attributes().Where(a => a.Name.LocalName != "Inherit"))
             parent.SetAttributeValue(attr.Name, attr.Value);
 
-        // Simple value override: if child has text but no elements, it wipes parent elements.
         if (!child.Elements().Any() && !string.IsNullOrEmpty(child.Value))
         {
             parent.RemoveNodes();
@@ -145,7 +135,7 @@ public static class XmlInheritanceHelper
 
         foreach (var childNode in child.Elements())
         {
-            
+
             if (childNode.Name.LocalName == "li" || isListContainer)
             {
                 parent.Add(new XElement(childNode));

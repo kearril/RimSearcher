@@ -4,37 +4,26 @@ using RimSearcher.Server.Tools;
 
 namespace RimSearcher.Server;
 
-/// <summary>
-/// Core class for the RimSearcher MCP server, handling JSON-RPC communication and tool dispatching.
-/// </summary>
 public sealed class RimSearcher
 {
     private readonly Dictionary<string, ITool> _tools = new();
     private readonly ConcurrentDictionary<string, CancellationTokenSource> _activeRequests = new();
     private readonly SemaphoreSlim _writeLock = new(1, 1);
     private readonly TextWriter _protocolOut;
-
-    // Limit max concurrency to balance response speed and system resource consumption.
+    
     private readonly SemaphoreSlim _concurrencyLimit = new(10, 10);
 
     public RimSearcher(TextWriter? protocolOut = null)
     {
         _protocolOut = protocolOut ?? Console.Out;
-        // Bind global logger delegate
         ServerLogger.OnLogAsync = (msg, level) => this.LogAsync(msg, level);
     }
-
-    /// <summary>
-    /// Registers an MCP tool.
-    /// </summary>
+    
     public void RegisterTool(ITool tool)
     {
         _tools[tool.Name] = tool;
     }
-
-    /// <summary>
-    /// Starts the server main loop, reading JSON-RPC messages from standard input.
-    /// </summary>
+    
     public async Task RunAsync()
     {
         while (true)
@@ -63,13 +52,12 @@ public sealed class RimSearcher
                     }
 
                     var method = methodProp.GetString();
-
-                    // Handle JSON-RPC cancellation notifications
+                    
                     if (method == "$.cancelRequest")
                     {
                         if (root.TryGetProperty("params", out var p) && p.TryGetProperty("id", out var cancelId))
                         {
-                            var idToCancel = cancelId.ToString(); // Use string for internal dictionary key
+                            var idToCancel = cancelId.ToString(); 
                             if (_activeRequests.TryRemove(idToCancel, out var targetCts))
                             {
                                 targetCts.Cancel();
@@ -82,8 +70,8 @@ public sealed class RimSearcher
                     bool hasId = root.TryGetProperty("id", out var idProp);
                     if (hasId)
                     {
-                        requestId = idProp; // Keep original JsonElement for response to ensure ID type consistency
-                        requestKey = idProp.ToString(); // Use string as key for tracking
+                        requestId = idProp; 
+                        requestKey = idProp.ToString(); 
                         cts = new CancellationTokenSource();
                         _activeRequests[requestKey] = cts;
                     }
@@ -132,7 +120,7 @@ public sealed class RimSearcher
                     serverInfo = new
                     {
                         name = "RimSearcher-Server",
-                        version = "2.4",
+                        version = "2.5",
                         description = "Specialized MCP server for deep RimWorld source code and XML Def analysis."
                     }
                 });
@@ -163,14 +151,14 @@ public sealed class RimSearcher
 
                 if (toolName != null && _tools.TryGetValue(toolName, out var tool))
                 {
-                    // Create progress reporter to send MCP notifications
+                  
                     var progressReporter = new Progress<double>(async p => 
                     {
                         await SendNotificationAsync("notifications/progress", new 
                         {
                             progress = p,
                             total = 1.0,
-                            progressToken = id // Progress is tied to the request ID
+                            progressToken = id 
                         });
                     });
 
@@ -195,9 +183,7 @@ public sealed class RimSearcher
         }
     }
 
-    /// <summary>
-    /// Sends a logging notification to the MCP client.
-    /// </summary>
+    
     public async Task LogAsync(string message, string level = "info", string? logger = "RimSearcher")
     {
         await SendNotificationAsync("notifications/logging/message", new
@@ -238,7 +224,6 @@ public sealed class RimSearcher
         await _writeLock.WaitAsync();
         try
         {
-            // Async write and flush to ensure JSON-RPC messages are delivered immediately.
             await _protocolOut.WriteLineAsync(json);
             await _protocolOut.FlushAsync();
         }

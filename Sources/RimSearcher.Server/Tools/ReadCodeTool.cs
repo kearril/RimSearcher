@@ -9,7 +9,7 @@ public class ReadCodeTool : ITool
     public string Name => "rimworld-searcher__read_code";
 
     public string Description =>
-        "Precision extraction of RimWorld's C# logic. Highly recommended: provide a `methodName` to isolate and retrieve only the relevant implementation block, bypassing thousands of lines of boilerplate. Use this to understand the actual execution logic of Comps, Workers, and Ticks.";
+        "Extracts C# source code from files. Provide 'methodName' to extract a specific method body (recommended). Or use 'startLine' and 'lineCount' for raw line-based reading. Essential for understanding implementation details of Comps, Workers, and game logic.";
 
     public string? Icon => "lucide:file-code";
 
@@ -64,15 +64,14 @@ public class ReadCodeTool : ITool
                 if (string.IsNullOrEmpty(body) || body.Contains("Method not found"))
                 {
                     return new ToolResult(
-                        $"Method '{methodName}' not found in {path}. Tips: 1. Ensure the name is correct; 2. Use 'inspect' tool on the class to see all available methods.",
+                        $"Method '{methodName}' not found in {Path.GetFileName(path)}. Use inspect tool to see available methods.",
                         true);
                 }
 
-                return new ToolResult($"# Method: {methodName}\n```csharp\n{body}\n```");
+                return new ToolResult($"```csharp\n// {methodName}\n{body}\n```");
             }
         }
 
-        // Fallback to line-based paginated reading mode.
         int startLine = args.TryGetProperty("startLine", out var sProp) ? sProp.GetInt32() : 0;
         int lineCount = args.TryGetProperty("lineCount", out var lProp) ? lProp.GetInt32() : 300;
 
@@ -80,21 +79,21 @@ public class ReadCodeTool : ITool
         {
             var allLines = File.ReadAllLines(path);
             int totalLines = allLines.Length;
-            
+
             var resultLines = allLines.Skip(startLine).Take(lineCount).Select((line, idx) => $"L{startLine + idx + 1}: {line}").ToList();
 
             if (resultLines.Count == 0)
-                return new ToolResult($"Line range {startLine}-{startLine + lineCount} exceeds file length ({totalLines} lines).", true);
+                return new ToolResult($"Line range {startLine + 1}-{startLine + lineCount} exceeds file length ({totalLines} lines).", true);
 
             var sb = new StringBuilder();
-            sb.AppendLine($"[Showing lines {startLine + 1} to {Math.Min(startLine + lineCount, totalLines)} of {totalLines} in {Path.GetFileName(path)}]");
-            sb.AppendLine("---");
-            foreach(var line in resultLines) sb.AppendLine(line);
-            
+            sb.AppendLine($"```csharp");
+            sb.AppendLine($"// {Path.GetFileName(path)} (lines {startLine + 1}-{Math.Min(startLine + lineCount, totalLines)} of {totalLines})");
+            foreach (var line in resultLines) sb.AppendLine(line);
+            sb.AppendLine("```");
+
             if (startLine + lineCount < totalLines)
             {
-                sb.AppendLine("---");
-                sb.AppendLine($"[End of segment. There are {totalLines - (startLine + lineCount)} more lines. Use 'read_code' with startLine={startLine + lineCount} to read more.]");
+                sb.AppendLine($"\n[{totalLines - (startLine + lineCount)} more lines available, use startLine={startLine + lineCount}]");
             }
 
             return new ToolResult(sb.ToString());

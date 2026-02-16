@@ -16,7 +16,7 @@ public class TraceTool : ITool
     public string Name => "rimworld-searcher__trace";
 
     public string Description =>
-        "Performs deep cross-reference analysis between C# and XML. Use `inheritors` mode to find all specialized variants of a base class (e.g., all `HediffComp` types). Use `usages` mode to perform comprehensive impact analysis by finding every file that references a specific symbol. Vital for detecting mod conflicts and identifying hook points.";
+        "Cross-reference analysis for C# and XML. Mode 'inheritors': finds all subclasses of a base type (e.g., all HediffComp variants). Mode 'usages': finds all files referencing a symbol. Useful for impact analysis and hook discovery.";
 
     public string? Icon => "lucide:git-branch";
 
@@ -52,15 +52,15 @@ public class TraceTool : ITool
         {
             cancellationToken.ThrowIfCancellationRequested();
             var inheritors = _sourceIndexer.GetInheritors(symbol);
-            if (inheritors.Count == 0) return new ToolResult($"No subclasses found for {symbol}.");
+            if (inheritors.Count == 0) return new ToolResult($"No subclasses of '{symbol}' found.");
 
             var results = inheritors.Select(name =>
             {
                 var paths = _sourceIndexer.GetPathsByType(name);
-                return $"{name} (in `{string.Join(", ", paths)}`)";
+                return $"- `{name}` ({string.Join(", ", paths.Select(System.IO.Path.GetFileName))})";
             });
 
-            return new ToolResult(string.Join(Environment.NewLine, results));
+            return new ToolResult($"Subclasses of '{symbol}':\n" + string.Join(Environment.NewLine, results));
         }
         else // usages mode
         {
@@ -77,13 +77,13 @@ public class TraceTool : ITool
             int globalCount = 0;
             int processedCount = 0;
             int totalFiles = files.Count;
-            bool truncated = false;
+            int truncatedFlag = 0;
 
             await Parallel.ForEachAsync(files, cancellationToken, async (file, ct) =>
             {
-                if (globalCount >= 50)
+                if (Interlocked.CompareExchange(ref globalCount, 0, 0) >= 50)
                 {
-                    truncated = true;
+                    Interlocked.Exchange(ref truncatedFlag, 1);
                     return;
                 }
 
@@ -97,8 +97,15 @@ public class TraceTool : ITool
                     {
                         if (regex.IsMatch(line))
                         {
-                            results.Add(file);
-                            Interlocked.Increment(ref globalCount);
+                            var currentCount = Interlocked.Increment(ref globalCount);
+                            if (currentCount <= 50)
+                            {
+                                results.Add(file);
+                            }
+                            if (currentCount >= 50)
+                            {
+                                Interlocked.Exchange(ref truncatedFlag, 1);
+                            }
                             break;
                         }
                     }
@@ -114,12 +121,13 @@ public class TraceTool : ITool
                 }
             });
 
-            if (results.Count == 0) return new ToolResult("No references found.");
+            if (results.Count == 0) return new ToolResult($"No references to '{symbol}' found.");
 
-            var output = string.Join(Environment.NewLine, results.Take(50).Select(r => $"- `{r}`"));
-            if (truncated || globalCount >= 50)
+            var output = $"References to '{symbol}':\n" + string.Join(Environment.NewLine, results.Take(50).Select(r => $"- {r}"));
+            var wasTruncated = Interlocked.CompareExchange(ref truncatedFlag, 0, 0) == 1;
+            if (wasTruncated)
             {
-                output += "\n\n--- WARNING: Too many results, truncated to first 50. ---";
+                output += $"\n\n[Truncated to 50 results]";
             }
 
             return new ToolResult(output);
