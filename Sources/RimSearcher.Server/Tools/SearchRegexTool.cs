@@ -15,7 +15,7 @@ public class SearchRegexTool : ITool
     public string Name => "rimworld-searcher__search_regex";
 
     public string Description =>
-        "Regex pattern search across all C# and XML files. Use for finding specific XML tags (e.g., '<thingClass>Apparel</thingClass>'), method signatures, or data patterns. Returns results grouped by file with line numbers and previews. Shows top 3 matches per file. Limit: 50 files. Use 'fileFilter' to restrict to specific file types.";
+        "Regex search across indexed C# and XML files. Returns grouped file results with line previews. Shows up to 3 matches per file and up to 50 files in output. Tested: pattern 'class.*:.*ThingComp' with fileFilter '.cs' returns broad inheritance matches.";
 
     public string? Icon => "lucide:search-code";
 
@@ -27,10 +27,10 @@ public class SearchRegexTool : ITool
             pattern = new
             {
                 type = "string",
-                description = "The regex pattern. Example: '<thingClass>Apparel</thingClass>' or 'void CompTick\\(\\)'."
+                description = "Regex pattern to search. Examples: '<thingClass>Apparel</thingClass>', 'void CompTick\\(\\)', 'class.*:.*ThingComp'."
             },
             ignoreCase = new { type = "boolean", description = "Whether to ignore case, defaults to true." },
-            fileFilter = new { type = "string", description = "Optional file extension filter. Example: '.cs' for C# only, '.xml' for XML only." }
+            fileFilter = new { type = "string", description = "Optional extension filter such as '.cs' or '.xml'." }
         },
         required = new[] { "pattern" }
     };
@@ -55,7 +55,6 @@ public class SearchRegexTool : ITool
             
             if (results.Count == 0) return new ToolResult($"No matches for pattern: {pattern}");
 
-            // Group by file for compact display
             var grouped = results.GroupBy(r => r.Path).Take(50);
             
             var output = $"Regex matches for '{pattern}' ({results.Count} found):\n\n" + 

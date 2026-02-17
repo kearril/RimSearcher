@@ -19,7 +19,6 @@ public static class UpdateChecker
     {
         try
         {
-            // Check cache first — skip if checked within last 24 hours
             if (TryReadCache(out var cachedVersion, out var cachedTime))
             {
                 if (DateTime.UtcNow - cachedTime < TimeSpan.FromHours(24))
@@ -56,14 +55,13 @@ public static class UpdateChecker
         }
         catch
         {
-            // Silently ignore all errors — update check is non-critical
         }
     }
 
     private static async Task NotifyUpdate(string latestVersion)
     {
         await ServerLogger.Warning(
-            $"RimSearcher v{latestVersion} is available (current: v{CurrentVersion}). " +
+            $"UpdateChecker: RimSearcher v{latestVersion} is available (current: v{CurrentVersion}). " +
             $"Download: https://github.com/kearril/RimSearcher/releases/latest");
     }
 
@@ -123,7 +121,6 @@ public static class UpdateChecker
         }
         catch
         {
-            // Ignore cache write failures
         }
     }
 }

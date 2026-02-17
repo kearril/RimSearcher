@@ -8,7 +8,7 @@ public class ListDirectoryTool : ITool
     public string Name => "rimworld-searcher__list_directory";
 
     public string Description =>
-        "Lists directory contents. Use to explore RimWorld source folder structure and verify file organization. Directories are suffixed with '/'.";
+        "List files and subdirectories for a given path. Directory names are suffixed with '/'. Supports limit paging and reports when more entries are available.";
 
     public string? Icon => "lucide:folder-tree";
 
@@ -20,12 +20,12 @@ public class ListDirectoryTool : ITool
             path = new
             {
                 type = "string",
-                description = "The full path of the directory to list. Example: '/path/to/RimWorld/Mods/MyMod/Defs'."
+                description = "Absolute directory path to inspect. Example: '/path/to/RimWorld/Source/Core/Defs'."
             },
             limit = new
             {
                 type = "integer",
-                description = "Maximum number of entries to return to prevent overflow.",
+                description = "Maximum entries to return. If exceeded, output includes a 'more entries available' hint.",
                 @default = 100
             }
         },

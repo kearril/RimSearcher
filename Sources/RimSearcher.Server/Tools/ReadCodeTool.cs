@@ -16,7 +16,7 @@ public class ReadCodeTool : ITool
     public string Name => "rimworld-searcher__read_code";
 
     public string Description =>
-        "Extracts C# source code from files. Provide 'methodName' to extract a specific member (method, property, constructor, indexer, operator). Use 'extractClass' to extract an entire class body. Or use 'startLine' and 'lineCount' for raw line-based reading (defaults to 150 lines). Essential for understanding implementation details of Comps, Workers, and game logic.";
+        "Read C# source by member, class, or line range. Supports methods/properties/constructors/indexers/operators via 'methodName', full type body via 'extractClass', and raw line reads. Tested: path 'CompShield.cs' + method 'CompTick' extracts the method body with line info.";
 
     public string? Icon => "lucide:file-code";
 
@@ -25,12 +25,12 @@ public class ReadCodeTool : ITool
         type = "object",
         properties = new
         {
-            path = new { type = "string", description = "Absolute file path (found via 'locate'). Example: '/path/to/RimWorld/Source/CompShield.cs'" },
+            path = new { type = "string", description = "File path or indexed file name. Examples: '/abs/path/CompShield.cs', 'CompShield.cs', 'CompShield'." },
             methodName = new
             {
                 type = "string",
                 description =
-                    "The member to extract: method ('CompTick'), property ('Label'), constructor (class name or '.ctor'), indexer ('this'), or operator ('+')."
+                    "Member to extract: method ('CompTick'), property ('Label'), constructor (class name or '.ctor'), indexer ('this'), or operator ('+')."
             },
             className = new
             {
@@ -45,12 +45,12 @@ public class ReadCodeTool : ITool
             startLine = new
             {
                 type = "integer",
-                description = "Optional: Starting line number (0-based). Used only if methodName is not provided."
+                description = "Optional 0-based start line for raw read mode (used when methodName/extractClass is not set)."
             },
             lineCount = new
             {
                 type = "integer",
-                description = "Optional: Number of lines to read. Defaults to 150."
+                description = "Optional number of lines for raw read mode. Default is 150."
             }
         },
         required = new[] { "path" }
@@ -61,7 +61,6 @@ public class ReadCodeTool : ITool
         var path = args.GetProperty("path").GetString();
         if (string.IsNullOrEmpty(path)) return new ToolResult("Path cannot be empty.", true);
 
-        // Auto-resolve: if path is not absolute or file doesn't exist, try to resolve via index
         var resolvedPath = ResolvePath(path);
         if (resolvedPath == null)
             return new ToolResult($"File not found: '{Path.GetFileName(path)}'. Use 'locate' to find the correct file first.", true);
@@ -71,7 +70,6 @@ public class ReadCodeTool : ITool
 
         try
         {
-            // Extract entire class body
             if (args.TryGetProperty("extractClass", out var ecProp))
             {
                 var extractClassName = ecProp.GetString();
@@ -84,7 +82,6 @@ public class ReadCodeTool : ITool
                 }
             }
 
-            // Extract specific member (method, property, constructor, etc.)
             if (args.TryGetProperty("methodName", out var mProp))
             {
                 var methodName = mProp.GetString();
@@ -103,9 +100,10 @@ public class ReadCodeTool : ITool
                 }
             }
 
-            // Fall back to raw line-based reading
-            int startLine = args.TryGetProperty("startLine", out var sProp) ? sProp.GetInt32() : 0;
+            int startLine = args.TryGetProperty("startLine", out var sProp) ? Math.Max(0, sProp.GetInt32()) : 0;
             int lineCount = args.TryGetProperty("lineCount", out var lProp) ? lProp.GetInt32() : 150;
+            if (lineCount <= 0)
+                return new ToolResult("lineCount must be greater than 0.", true);
 
             var allLines = File.ReadAllLines(path);
             int totalLines = allLines.Length;
@@ -136,17 +134,14 @@ public class ReadCodeTool : ITool
 
     private string? ResolvePath(string input)
     {
-        // 1. Absolute path that exists and is safe
         if (Path.IsPathRooted(input) && File.Exists(input) && PathSecurity.IsPathSafe(input))
             return input;
 
-        // 2. Index key is FileNameWithoutExtension — try that first
         var nameNoExt = Path.GetFileNameWithoutExtension(input);
         var indexPath = _sourceIndexer.GetPath(nameNoExt);
         if (indexPath != null && File.Exists(indexPath))
             return indexPath;
 
-        // 3. Also try the raw file name (in case index was built differently)
         var rawName = Path.GetFileName(input);
         if (rawName != nameNoExt)
         {

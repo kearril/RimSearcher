@@ -94,7 +94,7 @@ public static class XmlInheritanceHelper
     }
 
     /// <summary>
-    /// Legacy convenience method that returns the resolved XML as a string.
+    /// Convenience method that returns the resolved XML as a string.
     /// </summary>
     public static async Task<string> ResolveDefXmlAsync(string defName, DefIndexer indexer)
     {

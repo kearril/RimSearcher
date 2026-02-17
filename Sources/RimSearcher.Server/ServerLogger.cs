@@ -12,7 +12,6 @@ public static class ServerLogger
         }
         else
         {
-            // Fallback to stderr if server is not yet initialized
             await Console.Error.WriteLineAsync($"[{level.ToUpper()}] {message}");
         }
     }

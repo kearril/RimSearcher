@@ -35,7 +35,7 @@ public class InspectTool : ITool
     public string Name => "rimworld-searcher__inspect";
 
     public string Description =>
-        "Analyzes RimWorld defs and C# types. Resolves XML ParentName inheritance chains and exposes merged values. Extracts linked C# Worker/Comp classes from defs (shows top 10). Shows C# class outlines with inheritance graphs.";
+        "Inspect a RimWorld def or C# type in depth. For defs, resolves ParentName inheritance into merged XML and extracts linked C# classes. For C# types, returns inheritance graph and class outline. Tested with 'Apparel_ShieldBelt' and 'RimWorld.CompShield'.";
 
     public string? Icon => "lucide:eye";
 
@@ -47,7 +47,7 @@ public class InspectTool : ITool
             name = new
             {
                 type = "string",
-                description = "The exact DefName or Class name to inspect. Example: 'Apparel_ShieldBelt' or 'RimWorld.Pawn'."
+                description = "Exact DefName or C# type name. Examples: 'Apparel_ShieldBelt', 'RimWorld.CompShield'."
             }
         },
         required = new[] { "name" }
@@ -101,7 +101,6 @@ public class InspectTool : ITool
                 sb.AppendLine("```");
             }
 
-            // Extract linked C# types directly from the resolved XElement (no re-parse)
             try
             {
                 var foundTypes = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
@@ -144,7 +143,7 @@ public class InspectTool : ITool
             catch (OperationCanceledException) { throw; }
             catch (Exception ex)
             {
-                await ServerLogger.Debug($"InspectTool: Failed to extract linked types from {name}: {ex.Message}");
+                await ServerLogger.Debug($"InspectTool: Linked type extraction failed for {name}: {ex.Message}");
             }
 
             return new ToolResult(sb.ToString());

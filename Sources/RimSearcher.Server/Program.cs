@@ -10,24 +10,24 @@ var protocolOut = Console.Out;
 Console.SetOut(Console.Error);
 
 var (appConfig, configPath, isLoaded) = AppConfig.Load();
-await ServerLogger.Info($"Loading configuration from: {configPath}");
+await ServerLogger.Info($"Program: Loading configuration from {configPath}");
 
 bool hasPaths = appConfig.CsharpSourcePaths.Count > 0 || appConfig.XmlSourcePaths.Count > 0;
 
 if (!isLoaded)
 {
-    await ServerLogger.Error($"Configuration failed (File missing or JSON error) at: {configPath}");
+    await ServerLogger.Error($"Program: Failed to load configuration from {configPath} (file missing or JSON parse error)");
 }
 else if (!hasPaths)
 {
-    await ServerLogger.Warning($"No source paths defined in config: {configPath}");
+    await ServerLogger.Warning($"Program: No source paths defined in configuration {configPath}");
 }
 
 PathSecurity.Initialize(appConfig.CsharpSourcePaths.Concat(appConfig.XmlSourcePaths), enabled: !appConfig.SkipPathSecurity);
 
 if (appConfig.SkipPathSecurity)
 {
-    await ServerLogger.Info("Path security checks disabled via config");
+    await ServerLogger.Info("Program: Path security checks disabled by configuration");
 }
 
 var indexer = new SourceIndexer();
@@ -66,18 +66,17 @@ foreach (var path in appConfig.XmlSourcePaths)
 
 if (totalCsharpPaths > 0 || totalXmlPaths > 0)
 {
-    // Freeze indices for optimized read-only access
     indexer.FreezeIndex();
     defIndexer.FreezeIndex();
-    await ServerLogger.Info($"Indexed {totalCsharpPaths} C# paths and {totalXmlPaths} XML paths");
+    await ServerLogger.Info($"Program: Index build completed (C# paths: {totalCsharpPaths}, XML paths: {totalXmlPaths})");
 }
 
 if (failedPaths.Count > 0)
 {
-    await ServerLogger.Warning($"Failed to access {failedPaths.Count} paths:");
+    await ServerLogger.Warning($"Program: Failed to access {failedPaths.Count} configured paths");
     foreach (var failed in failedPaths)
     {
-        await ServerLogger.Warning($"  - {failed}");
+        await ServerLogger.Warning($"Program: Unavailable path: {failed}");
     }
 }
 
@@ -92,10 +91,9 @@ server.RegisterTool(new SearchRegexTool(indexer));
 
 if (isLoaded && hasPaths)
 {
-    await ServerLogger.Info("RimSearcher MCP Server started...");
+    await ServerLogger.Info("Program: RimSearcher MCP server started");
 }
 
-// Fire-and-forget update check (non-blocking, errors silently ignored)
 if (appConfig.CheckUpdates)
 {
     _ = Task.Run(async () => await UpdateChecker.CheckAsync());

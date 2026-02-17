@@ -27,7 +27,6 @@ public partial class DefIndexer
     private readonly ConcurrentDictionary<string, byte> _processedFiles = new(StringComparer.OrdinalIgnoreCase);
     private static readonly XmlReaderSettings SafeSettings = new() { DtdProcessing = DtdProcessing.Prohibit };
     
-    // Frozen indices for read-optimized access
     private FrozenDictionary<string, DefLocation>? _frozenDefNameIndex;
     private FrozenDictionary<string, DefLocation>? _frozenParentNameIndex;
     private FrozenDictionary<string, DefLocation[]>? _frozenLabelIndex;
@@ -84,7 +83,6 @@ public partial class DefIndexer
             
             try
             {
-                // Single-pass: load XDocument once for both metadata extraction and field content indexing
                 var doc = GetOrLoadDocument(internedFile);
                 if (doc.Root == null || doc.Root.Name.LocalName != "Defs") return;
 
@@ -111,7 +109,6 @@ public partial class DefIndexer
                         _labelIndex.GetOrAdd(label, _ => new ConcurrentBag<DefLocation>()).Add(loc);
                     }
 
-                    // Index field contents in the same pass
                     IndexElementRecursive(defElement, loc, "", 0);
 
                     Interlocked.Increment(ref totalParsed);
@@ -122,7 +119,7 @@ public partial class DefIndexer
 
         if (_logger != null && totalParsed > 0)
         {
-            _logger.LogInformation("DefIndexer: Parsed {Count} defs", totalParsed);
+            _logger.LogInformation("DefIndexer: XML scan parsed {Count} defs", totalParsed);
         }
     }
 

@@ -6,7 +6,6 @@ namespace RimSearcher.Core;
 
 public class SourceIndexer
 {
-    // Mutable indices used during Scan()
     private readonly ConcurrentDictionary<string, ConcurrentBag<string>> _index = new(StringComparer.OrdinalIgnoreCase);
     private readonly ConcurrentDictionary<string, ConcurrentBag<string>> _typeMap = new(StringComparer.OrdinalIgnoreCase);
     private readonly ConcurrentDictionary<string, string> _inheritanceMap = new(StringComparer.OrdinalIgnoreCase);
@@ -20,7 +19,6 @@ public class SourceIndexer
     private readonly ConcurrentDictionary<string, byte> _processedFiles = new(StringComparer.OrdinalIgnoreCase);
     private List<string> _cachedAllTypeNames = new();
     
-    // Frozen (read-optimized) indices — populated by FreezeIndex()
     private FrozenDictionary<string, string[]>? _frozenIndex;
     private FrozenDictionary<string, string[]>? _frozenTypeMap;
     private FrozenDictionary<string, string[]>? _frozenInheritorsMap;
@@ -73,7 +71,6 @@ public class SourceIndexer
 
             if (internedFile.EndsWith(".cs"))
             {
-                // Single-parse: extract both inheritance and members in one Roslyn pass
                 var (inheritance, members) = RoslynHelper.GetClassInfoCombined(internedFile);
                 
                 foreach (var (fullName, baseType) in inheritance)
@@ -92,7 +89,6 @@ public class SourceIndexer
                     IndexNgrams(shortName);
                 }
                 
-                // Index members from the same parse result
                 IndexMembersFromList(members, internedFile);
             }
         });
@@ -125,7 +121,6 @@ public class SourceIndexer
         return result;
     }
 
-    // Helper accessors that prefer frozen indices
     private bool TryGetInheritors(string key, out IReadOnlyList<string> values)
     {
         if (_frozenInheritorsMap != null && _frozenInheritorsMap.TryGetValue(key, out var frozen))
@@ -252,16 +247,6 @@ public class SourceIndexer
             .ToList();
     }
 
-    private void IndexMembers(string filePath)
-    {
-        try
-        {
-            var members = RoslynHelper.ExtractAllMembers(filePath);
-            IndexMembersFromList(members, filePath);
-        }
-        catch { }
-    }
-
     private void IndexMembersFromList(List<(string TypeName, string MemberName, string MemberType)> members, string filePath)
     {
         foreach (var (typeName, memberName, memberType) in members)
@@ -346,7 +331,6 @@ public class SourceIndexer
         if (keywords == null || keywords.Length == 0) return new List<(string, string, string, string, double)>();
         var matchedMembers = new Dictionary<(string, string, string, string), int>();
         
-        // Use frozen index if available
         var memberKeys = _frozenMemberIndex != null 
             ? (IEnumerable<string>)_frozenMemberIndex.Keys 
             : _memberIndex.Keys;
@@ -371,7 +355,6 @@ public class SourceIndexer
                 }
             }
 
-            // Use prefix matching + n-gram candidate reduction instead of exhaustive linear scan
             IEnumerable<string> fuzzyCandidates;
             if (keyLower.Length >= 3)
             {
@@ -391,7 +374,6 @@ public class SourceIndexer
             }
             else
             {
-                // For very short keywords, use prefix match only
                 fuzzyCandidates = memberKeys.Where(k => k.StartsWith(keyLower, StringComparison.OrdinalIgnoreCase)).Take(50);
             }
             

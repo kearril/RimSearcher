@@ -61,7 +61,7 @@ public sealed class RimSearcher
                             if (_activeRequests.TryRemove(idToCancel, out var targetCts))
                             {
                                 targetCts.Cancel();
-                                await ServerLogger.Debug($"Client cancelled request {idToCancel}");
+                                await ServerLogger.Debug($"RimSearcher: Client cancelled request {idToCancel}");
                             }
                         }
                         return;

@@ -19,7 +19,7 @@ public class LocateTool : ITool
     public string Name => "rimworld-searcher__locate";
 
     public string Description =>
-        "Fuzzy search for RimWorld C# classes, methods, fields, and XML defs. Supports typo tolerance, CamelCase shortcuts (e.g., 'JDW' → 'JobDriver_Wait'), and query filters (type:, method:, field:, def:). Primary tool for locating code elements.";
+        "Fuzzy locate RimWorld C# types/members and XML defs. Supports typo tolerance, CamelCase shortcuts (e.g., 'JDW' -> 'JobDriver_Wait'), and filters (type:, method:, field:, def:). Tested: 'def:Apparel_ShieldBelt' returns ranked def hits.";
 
     public string? Icon => "lucide:map-pin";
 
@@ -32,7 +32,7 @@ public class LocateTool : ITool
             {
                 type = "string",
                 description =
-                    "The term to find (DefName, Class, or filename). Example: 'Apparel_ShieldBelt' or 'RimWorld.Pawn'."
+                    "Search text or filtered query. Examples: 'Apparel_ShieldBelt', 'RimWorld.Pawn', 'def:Apparel_ShieldBelt', 'method:CompTick'."
             }
         },
         required = new[] { "query" }
@@ -137,7 +137,6 @@ public class LocateTool : ITool
             }
         }
 
-        // Only run file name search if we haven't found much yet
         bool hasResults = sb.Length > rawQuery.Length + 10;
         if (!hasResults)
         {

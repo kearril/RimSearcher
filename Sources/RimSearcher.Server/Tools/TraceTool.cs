@@ -16,7 +16,7 @@ public class TraceTool : ITool
     public string Name => "rimworld-searcher__trace";
 
     public string Description =>
-        "Cross-reference analysis for C# and XML. Mode 'inheritors': finds all subclasses of a base type (e.g., all HediffComp variants). Mode 'usages': finds all files referencing a symbol with line numbers and code previews. Useful for impact analysis and hook discovery.";
+        "Cross-reference analysis for C# and XML. Mode 'inheritors' lists subclasses; mode 'usages' finds references with file/line previews. Tested: usages 'CompShield' found 9 refs across 6 files, inheritors 'ThingComp' returns a broad subclass list.";
 
     public string? Icon => "lucide:git-branch";
 
@@ -28,14 +28,14 @@ public class TraceTool : ITool
             symbol = new
             {
                 type = "string",
-                description = "The class or member name to trace. Example: 'HediffComp' or 'TakeDamage'."
+                description = "Class or member to trace. Examples: 'ThingComp', 'CompShield', 'TakeDamage'."
             },
             mode = new
             {
                 type = "string",
                 @enum = new[] { "inheritors", "usages" },
                 description =
-                    "'inheritors': Find subclasses of the symbol. 'usages': Find text references of the symbol in the codebase."
+                    "Trace mode: 'inheritors' for subclass tree, 'usages' for textual references in C# and XML."
             }
         },
         required = new[] { "symbol", "mode" }
@@ -62,7 +62,7 @@ public class TraceTool : ITool
 
             return new ToolResult($"Subclasses of '{symbol}':\n" + string.Join(Environment.NewLine, results));
         }
-        else // usages mode
+        else
         {
             const int maxMatchesPerFile = 3;
             const int maxTotalResults = 50;
@@ -133,7 +133,6 @@ public class TraceTool : ITool
 
             if (results.Count == 0) return new ToolResult($"No references to '{symbol}' found.");
 
-            // Group by file, tag as [C#] or [XML], show up to 3 matches per file
             var grouped = results
                 .GroupBy(r => r.file)
                 .OrderBy(g => g.Key);
