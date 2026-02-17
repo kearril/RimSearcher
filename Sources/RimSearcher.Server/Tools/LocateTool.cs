@@ -55,7 +55,7 @@ public class LocateTool : ITool
             var typeSearchTerm = query.TypeFilter ?? QueryParser.GetCombinedSearchTerm(query);
             var types = _sourceIndexer.FuzzySearchTypes(typeSearchTerm);
 
-            if (types.Any())
+            if (types.Count > 0)
             {
                 sb.AppendLine("\n**C# Types:**");
                 foreach (var (typeName, score) in types.Take(10))
@@ -70,7 +70,7 @@ public class LocateTool : ITool
             }
         }
 
-        if (query.MethodFilter != null || query.FieldFilter != null || query.Keywords.Any())
+        if (query.MethodFilter != null || query.FieldFilter != null || query.Keywords.Count > 0)
         {
             var keywords = new List<string>();
             if (query.MethodFilter != null) keywords.Add(query.MethodFilter);
@@ -79,7 +79,7 @@ public class LocateTool : ITool
 
             var members = _sourceIndexer.SearchMembersByKeywords(keywords.ToArray());
 
-            if (members.Any())
+            if (members.Count > 0)
             {
                 sb.AppendLine("\n**Members:**");
 
@@ -87,13 +87,14 @@ public class LocateTool : ITool
 
                 foreach (var group in groupedMembers)
                 {
+                    var groupItems = group.ToList();
                     sb.AppendLine($"  {group.Key}s:");
-                    foreach (var (typeName, memberName, memberType, filePath, score) in group.Take(5))
+                    foreach (var (typeName, memberName, memberType, filePath, score) in groupItems.Take(5))
                     {
                         sb.AppendLine($"  - `{typeName}.{memberName}` ({score:F0}%) - {Path.GetFileName(filePath)}");
                     }
-                    if (group.Count() > 5)
-                        sb.AppendLine($"    ... +{group.Count() - 5} more");
+                    if (groupItems.Count > 5)
+                        sb.AppendLine($"    ... +{groupItems.Count - 5} more");
                 }
             }
         }
@@ -103,7 +104,7 @@ public class LocateTool : ITool
             var defSearchTerm = query.DefFilter ?? QueryParser.GetCombinedSearchTerm(query);
             var defs = _defIndexer.FuzzySearch(defSearchTerm);
 
-            if (defs.Any())
+            if (defs.Count > 0)
             {
                 sb.AppendLine("\n**XML Defs:**");
                 foreach (var (def, score) in defs.Take(10))
@@ -116,11 +117,11 @@ public class LocateTool : ITool
                     sb.AppendLine($"  ... +{defs.Count - 10} more");
             }
 
-            if (query.Keywords.Any())
+            if (query.Keywords.Count > 0)
             {
                 var defsByContent = _defIndexer.SearchByContent(query.Keywords.ToArray());
 
-                if (defsByContent.Any())
+                if (defsByContent.Count > 0)
                 {
                     sb.AppendLine("\n**Content Matches:**");
 
@@ -136,22 +137,25 @@ public class LocateTool : ITool
             }
         }
 
-        var files = _sourceIndexer.Search(rawQuery).Distinct().ToList();
-        if (files.Any() && files.Count <= 10)
+        // Only run file name search if we haven't found much yet
+        bool hasResults = sb.Length > rawQuery.Length + 10;
+        if (!hasResults)
         {
-            sb.AppendLine("\n**Files:**");
-            foreach (var file in files.Take(10))
+            var files = _sourceIndexer.Search(rawQuery).Distinct().ToList();
+            if (files.Count > 0)
             {
-                sb.AppendLine($"- {Path.GetFileName(file)} - {file}");
+                sb.AppendLine("\n**Files:**");
+                foreach (var file in files.Take(10))
+                {
+                    sb.AppendLine($"- {Path.GetFileName(file)} - {file}");
+                }
+                if (files.Count > 10)
+                    sb.AppendLine($"  ... +{files.Count - 10} more");
+                hasResults = true;
             }
-            if (files.Count > 10)
-                sb.AppendLine($"  ... +{files.Count - 10} more");
         }
 
-        var result = sb.ToString();
-
-        var resultLines = result.Split('\n').Where(l => !string.IsNullOrWhiteSpace(l)).ToList();
-        if (resultLines.Count <= 1)
+        if (!hasResults)
         {
             return new ToolResult(
                 $"No results for '{rawQuery}'.\n\n" +
@@ -159,6 +163,6 @@ public class LocateTool : ITool
                 true);
         }
 
-        return new ToolResult(result);
+        return new ToolResult(sb.ToString());
     }
 }

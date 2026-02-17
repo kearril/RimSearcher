@@ -46,14 +46,18 @@ public class ListDirectoryTool : ITool
 
         try
         {
-            var allEntries = Directory.GetFileSystemEntries(path).ToList();
-            var displayedEntries = allEntries.Take(limit)
+            var entries = Directory.EnumerateFileSystemEntries(path)
+                .Take(limit + 1)
+                .ToList();
+
+            var hasMore = entries.Count > limit;
+            var displayedEntries = entries.Take(limit)
                 .Select(e => Path.GetFileName(e) + (Directory.Exists(e) ? "/" : ""));
 
             var result = $"`{path}`\n" + string.Join("\n", displayedEntries);
-            if (allEntries.Count > limit)
+            if (hasMore)
             {
-                result += $"\n... [{allEntries.Count - limit} more entries]";
+                result += $"\n... [more entries available, increase limit]";
             }
             return new ToolResult(result);
         }

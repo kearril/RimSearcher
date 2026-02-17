@@ -39,6 +39,61 @@ public static class RoslynHelper
         }
     }
 
+    /// <summary>
+    /// Parses a C# file once and extracts both inheritance map and all members.
+    /// Avoids the double-parse overhead of calling GetClassInheritanceMap + ExtractAllMembers separately.
+    /// </summary>
+    public static (Dictionary<string, string?> Inheritance, List<(string TypeName, string MemberName, string MemberType)> Members)
+        GetClassInfoCombined(string path)
+    {
+        var emptyInheritance = new Dictionary<string, string?>();
+        var emptyMembers = new List<(string, string, string)>();
+
+        try
+        {
+            if (!File.Exists(path) || new FileInfo(path).Length > MaxFileSize)
+                return (emptyInheritance, emptyMembers);
+
+            using var stream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
+            using var reader = new StreamReader(stream);
+            var code = reader.ReadToEnd();
+
+            var tree = CSharpSyntaxTree.ParseText(code);
+            var root = tree.GetCompilationUnitRoot();
+
+            var types = root.DescendantNodes().OfType<TypeDeclarationSyntax>().ToList();
+
+            // Extract inheritance
+            var inheritance = types
+                .Select(t => new { FullName = GetFullTypeName(t), Base = t.BaseList?.Types.FirstOrDefault()?.ToString() })
+                .GroupBy(x => x.FullName)
+                .ToDictionary(g => g.Key, g => g.First().Base);
+
+            // Extract members
+            var members = new List<(string TypeName, string MemberName, string MemberType)>();
+            foreach (var type in types)
+            {
+                var typeName = GetFullTypeName(type);
+                foreach (var method in type.Members.OfType<MethodDeclarationSyntax>())
+                    members.Add((typeName, method.Identifier.Text, "Method"));
+                foreach (var prop in type.Members.OfType<PropertyDeclarationSyntax>())
+                    members.Add((typeName, prop.Identifier.Text, "Property"));
+                foreach (var field in type.Members.OfType<FieldDeclarationSyntax>())
+                    foreach (var variable in field.Declaration.Variables)
+                        members.Add((typeName, variable.Identifier.Text, "Field"));
+                foreach (var evt in type.Members.OfType<EventFieldDeclarationSyntax>())
+                    foreach (var variable in evt.Declaration.Variables)
+                        members.Add((typeName, variable.Identifier.Text, "Event"));
+            }
+
+            return (inheritance, members);
+        }
+        catch
+        {
+            return (emptyInheritance, emptyMembers);
+        }
+    }
+
     private static string GetFullTypeName(TypeDeclarationSyntax typeDeclaration)
     {
         var nameStack = new Stack<string>();
@@ -163,6 +218,110 @@ public static class RoslynHelper
             sb.AppendLine("\n// --- NEXT MATCH ---\n");
         }
         return sb.ToString();
+    }
+
+    public static async Task<string> GetMemberBodyAsync(string filePath, string memberName, string? typeName = null)
+    {
+        if (!File.Exists(filePath)) return "File not found.";
+        if (new FileInfo(filePath).Length > MaxFileSize) return "File too large, skipping parsing.";
+
+        string code;
+        using (var stream = new FileStream(filePath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite))
+        using (var reader = new StreamReader(stream))
+        {
+            code = await reader.ReadToEndAsync();
+        }
+
+        var tree = CSharpSyntaxTree.ParseText(code);
+        var root = await tree.GetRootAsync();
+
+        bool TypeFilter(SyntaxNode node)
+        {
+            if (string.IsNullOrEmpty(typeName)) return true;
+            var parentType = node.Ancestors().OfType<TypeDeclarationSyntax>().FirstOrDefault();
+            return parentType != null && (
+                parentType.Identifier.Text.Equals(typeName, StringComparison.OrdinalIgnoreCase) ||
+                GetFullTypeName(parentType).Equals(typeName, StringComparison.OrdinalIgnoreCase));
+        }
+
+        var candidates = new List<(SyntaxNode Node, string Kind)>();
+
+        // Methods
+        foreach (var m in root.DescendantNodes().OfType<MethodDeclarationSyntax>()
+                     .Where(m => m.Identifier.Text.Equals(memberName, StringComparison.OrdinalIgnoreCase) && TypeFilter(m)))
+            candidates.Add((m, "Method"));
+
+        // Properties
+        foreach (var p in root.DescendantNodes().OfType<PropertyDeclarationSyntax>()
+                     .Where(p => p.Identifier.Text.Equals(memberName, StringComparison.OrdinalIgnoreCase) && TypeFilter(p)))
+            candidates.Add((p, "Property"));
+
+        // Constructors (match by class name or ".ctor")
+        foreach (var c in root.DescendantNodes().OfType<ConstructorDeclarationSyntax>()
+                     .Where(c => (c.Identifier.Text.Equals(memberName, StringComparison.OrdinalIgnoreCase) ||
+                                  memberName.Equals(".ctor", StringComparison.OrdinalIgnoreCase)) && TypeFilter(c)))
+            candidates.Add((c, "Constructor"));
+
+        // Indexers (match by "this" or "Indexer")
+        if (memberName.Equals("this", StringComparison.OrdinalIgnoreCase) ||
+            memberName.Equals("indexer", StringComparison.OrdinalIgnoreCase))
+        {
+            foreach (var idx in root.DescendantNodes().OfType<IndexerDeclarationSyntax>().Where(TypeFilter))
+                candidates.Add((idx, "Indexer"));
+        }
+
+        // Operators
+        foreach (var op in root.DescendantNodes().OfType<OperatorDeclarationSyntax>()
+                     .Where(o => o.OperatorToken.Text.Equals(memberName, StringComparison.OrdinalIgnoreCase) && TypeFilter(o)))
+            candidates.Add((op, "Operator"));
+
+        if (candidates.Count == 0) return $"Member '{memberName}' not found.";
+
+        if (candidates.Count == 1)
+        {
+            var (node, kind) = candidates[0];
+            var lineSpan = node.GetLocation().GetLineSpan();
+            return $"// File: {filePath}\n// {kind}, starts at line: {lineSpan.StartLinePosition.Line + 1}\n{node.ToFullString()}";
+        }
+
+        var sb = new StringBuilder();
+        sb.AppendLine($"/* Found {candidates.Count} matching members */");
+        foreach (var (node, kind) in candidates)
+        {
+            var lineSpan = node.GetLocation().GetLineSpan();
+            var parentType = node.Ancestors().OfType<TypeDeclarationSyntax>().FirstOrDefault();
+            sb.AppendLine($"// {kind} in {(parentType != null ? GetFullTypeName(parentType) : "Unknown")}");
+            sb.AppendLine($"// Starts at line: {lineSpan.StartLinePosition.Line + 1}");
+            sb.AppendLine(node.ToFullString());
+            sb.AppendLine("\n// --- NEXT MATCH ---\n");
+        }
+        return sb.ToString();
+    }
+
+    public static async Task<string> GetClassBodyAsync(string filePath, string className)
+    {
+        if (!File.Exists(filePath)) return "File not found.";
+        if (new FileInfo(filePath).Length > MaxFileSize) return "File too large, skipping parsing.";
+
+        string code;
+        using (var stream = new FileStream(filePath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite))
+        using (var reader = new StreamReader(stream))
+        {
+            code = await reader.ReadToEndAsync();
+        }
+
+        var tree = CSharpSyntaxTree.ParseText(code);
+        var root = await tree.GetRootAsync();
+
+        var typeMatch = root.DescendantNodes().OfType<TypeDeclarationSyntax>()
+            .FirstOrDefault(t =>
+                t.Identifier.Text.Equals(className, StringComparison.OrdinalIgnoreCase) ||
+                GetFullTypeName(t).Equals(className, StringComparison.OrdinalIgnoreCase));
+
+        if (typeMatch == null) return $"Class '{className}' not found.";
+
+        var lineSpan = typeMatch.GetLocation().GetLineSpan();
+        return $"// File: {filePath}\n// Starts at line: {lineSpan.StartLinePosition.Line + 1}\n{typeMatch.ToFullString()}";
     }
 
     public static List<(string TypeName, string MemberName, string MemberType)> ExtractAllMembers(string filePath)

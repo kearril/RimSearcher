@@ -64,6 +64,9 @@ public class TraceTool : ITool
         }
         else // usages mode
         {
+            const int maxMatchesPerFile = 3;
+            const int maxTotalResults = 50;
+            
             var results = new ConcurrentBag<(string file, int lineNum, string preview)>();
             var files = _sourceIndexer.GetAllFiles()
                 .Where(f => f.EndsWith(".cs") || f.EndsWith(".xml"))
@@ -81,7 +84,7 @@ public class TraceTool : ITool
 
             await Parallel.ForEachAsync(files, cancellationToken, async (file, ct) =>
             {
-                if (Interlocked.CompareExchange(ref globalCount, 0, 0) >= 50)
+                if (Interlocked.CompareExchange(ref globalCount, 0, 0) >= maxTotalResults)
                 {
                     Interlocked.Exchange(ref truncatedFlag, 1);
                     return;
@@ -94,23 +97,26 @@ public class TraceTool : ITool
 
                     string? line;
                     int lineNum = 0;
+                    int matchesInFile = 0;
                     while ((line = await reader.ReadLineAsync(ct)) != null)
                     {
                         lineNum++;
                         if (regex.IsMatch(line))
                         {
                             var currentCount = Interlocked.Increment(ref globalCount);
-                            if (currentCount <= 50)
+                            if (currentCount <= maxTotalResults)
                             {
                                 var preview = line.Trim();
-                                if (preview.Length > 80) preview = preview.Substring(0, 77) + "...";
+                                if (preview.Length > 100) preview = preview[..97] + "...";
                                 results.Add((file, lineNum, preview));
                             }
-                            if (currentCount >= 50)
+                            matchesInFile++;
+                            if (matchesInFile >= maxMatchesPerFile || currentCount >= maxTotalResults)
                             {
-                                Interlocked.Exchange(ref truncatedFlag, 1);
+                                if (currentCount >= maxTotalResults)
+                                    Interlocked.Exchange(ref truncatedFlag, 1);
+                                break;
                             }
-                            break;
                         }
                     }
                 }
@@ -127,18 +133,34 @@ public class TraceTool : ITool
 
             if (results.Count == 0) return new ToolResult($"No references to '{symbol}' found.");
 
-            var sortedResults = results.OrderBy(r => r.file).ThenBy(r => r.lineNum).Take(50);
-            var output = $"References to '{symbol}' ({results.Count} found):\n\n" + 
-                         string.Join(Environment.NewLine, sortedResults.Select(r => 
-                             $"- `{System.IO.Path.GetFileName(r.file)}:{r.lineNum}` - {r.preview}"));
-            
-            var wasTruncated = Interlocked.CompareExchange(ref truncatedFlag, 0, 0) == 1;
-            if (wasTruncated || results.Count > 50)
+            // Group by file, tag as [C#] or [XML], show up to 3 matches per file
+            var grouped = results
+                .GroupBy(r => r.file)
+                .OrderBy(g => g.Key);
+
+            int totalMatches = results.Count;
+            var sb = new System.Text.StringBuilder();
+            sb.AppendLine($"References to '{symbol}' ({totalMatches} found):");
+            sb.AppendLine();
+
+            foreach (var group in grouped)
             {
-                output += $"\n\n[Showing first 50 of {results.Count} matches]";
+                var fileTag = group.Key.EndsWith(".xml") ? "[XML]" : "[C#]";
+                var fileName = System.IO.Path.GetFileName(group.Key);
+                sb.AppendLine($"{fileTag} `{fileName}`");
+                foreach (var match in group.OrderBy(m => m.lineNum))
+                {
+                    sb.AppendLine($"  L{match.lineNum}: {match.preview}");
+                }
             }
 
-            return new ToolResult(output);
+            var wasTruncated = Interlocked.CompareExchange(ref truncatedFlag, 0, 0) == 1;
+            if (wasTruncated || totalMatches >= maxTotalResults)
+            {
+                sb.AppendLine($"\n[Results truncated at {maxTotalResults}, use more specific symbol to narrow down]");
+            }
+
+            return new ToolResult(sb.ToString());
         }
     }
 }

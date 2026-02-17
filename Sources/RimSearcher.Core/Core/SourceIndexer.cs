@@ -1,10 +1,12 @@
 using System.Collections.Concurrent;
+using System.Collections.Frozen;
 using System.Text.RegularExpressions;
 
 namespace RimSearcher.Core;
 
 public class SourceIndexer
 {
+    // Mutable indices used during Scan()
     private readonly ConcurrentDictionary<string, ConcurrentBag<string>> _index = new(StringComparer.OrdinalIgnoreCase);
     private readonly ConcurrentDictionary<string, ConcurrentBag<string>> _typeMap = new(StringComparer.OrdinalIgnoreCase);
     private readonly ConcurrentDictionary<string, string> _inheritanceMap = new(StringComparer.OrdinalIgnoreCase);
@@ -17,6 +19,42 @@ public class SourceIndexer
     private readonly ConcurrentDictionary<string, ConcurrentBag<string>> _ngramIndex = new(StringComparer.OrdinalIgnoreCase);
     private readonly ConcurrentDictionary<string, byte> _processedFiles = new(StringComparer.OrdinalIgnoreCase);
     private List<string> _cachedAllTypeNames = new();
+    
+    // Frozen (read-optimized) indices — populated by FreezeIndex()
+    private FrozenDictionary<string, string[]>? _frozenIndex;
+    private FrozenDictionary<string, string[]>? _frozenTypeMap;
+    private FrozenDictionary<string, string[]>? _frozenInheritorsMap;
+    private FrozenDictionary<string, string[]>? _frozenShortTypeMap;
+    private FrozenDictionary<string, string[]>? _frozenNgramIndex;
+    private FrozenDictionary<string, (string TypeName, string MemberName, string MemberType, string FilePath)[]>? _frozenMemberIndex;
+    public bool IsFrozen { get; private set; }
+    
+    /// <summary>
+    /// Converts all mutable concurrent indices to frozen read-optimized collections.
+    /// Call after all Scan() calls are complete. Deduplicates entries and reduces memory.
+    /// </summary>
+    public void FreezeIndex()
+    {
+        _frozenIndex = _index.ToFrozenDictionary(
+            kv => kv.Key, kv => kv.Value.Distinct().ToArray(), StringComparer.OrdinalIgnoreCase);
+        _frozenTypeMap = _typeMap.ToFrozenDictionary(
+            kv => kv.Key, kv => kv.Value.Distinct().ToArray(), StringComparer.OrdinalIgnoreCase);
+        _frozenInheritorsMap = _inheritorsMap.ToFrozenDictionary(
+            kv => kv.Key, kv => kv.Value.Distinct().ToArray(), StringComparer.OrdinalIgnoreCase);
+        _frozenShortTypeMap = _shortTypeMap.ToFrozenDictionary(
+            kv => kv.Key, kv => kv.Value.Distinct().ToArray(), StringComparer.OrdinalIgnoreCase);
+        _frozenNgramIndex = _ngramIndex.ToFrozenDictionary(
+            kv => kv.Key, kv => kv.Value.Distinct().ToArray(), StringComparer.OrdinalIgnoreCase);
+        _frozenMemberIndex = _memberIndex.ToFrozenDictionary(
+            kv => kv.Key, 
+            kv => kv.Value.Distinct().ToArray(), 
+            StringComparer.OrdinalIgnoreCase);
+        
+        _cachedAllTypeNames = _frozenTypeMap.Keys.Concat(_frozenShortTypeMap.Keys)
+            .Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+        
+        IsFrozen = true;
+    }
 
     public void Scan(string rootPath)
     {
@@ -35,7 +73,9 @@ public class SourceIndexer
 
             if (internedFile.EndsWith(".cs"))
             {
-                var inheritance = RoslynHelper.GetClassInheritanceMap(internedFile);
+                // Single-parse: extract both inheritance and members in one Roslyn pass
+                var (inheritance, members) = RoslynHelper.GetClassInfoCombined(internedFile);
+                
                 foreach (var (fullName, baseType) in inheritance)
                 {
                     _typeMap.GetOrAdd(fullName, _ => new ConcurrentBag<string>()).Add(internedFile);
@@ -51,7 +91,9 @@ public class SourceIndexer
                     IndexNgrams(fullName);
                     IndexNgrams(shortName);
                 }
-                IndexMembers(internedFile);
+                
+                // Index members from the same parse result
+                IndexMembersFromList(members, internedFile);
             }
         });
 
@@ -83,20 +125,49 @@ public class SourceIndexer
         return result;
     }
 
+    // Helper accessors that prefer frozen indices
+    private bool TryGetInheritors(string key, out IReadOnlyList<string> values)
+    {
+        if (_frozenInheritorsMap != null && _frozenInheritorsMap.TryGetValue(key, out var frozen))
+        { values = frozen; return true; }
+        if (_inheritorsMap.TryGetValue(key, out var bag))
+        { values = bag.ToArray(); return true; }
+        values = Array.Empty<string>(); return false;
+    }
+    
+    private bool TryGetShortType(string key, out IReadOnlyList<string> values)
+    {
+        if (_frozenShortTypeMap != null && _frozenShortTypeMap.TryGetValue(key, out var frozen))
+        { values = frozen; return true; }
+        if (_shortTypeMap.TryGetValue(key, out var bag))
+        { values = bag.ToArray(); return true; }
+        values = Array.Empty<string>(); return false;
+    }
+    
+    private bool ContainsType(string key) =>
+        (_frozenTypeMap?.ContainsKey(key) ?? false) || _typeMap.ContainsKey(key);
+    
+    private IReadOnlyList<string> GetTypeFiles(string key)
+    {
+        if (_frozenTypeMap != null && _frozenTypeMap.TryGetValue(key, out var frozen)) return frozen;
+        if (_typeMap.TryGetValue(key, out var bag)) return bag.ToArray();
+        return Array.Empty<string>();
+    }
+
     public List<string> GetInheritors(string baseTypeName)
     {
         var results = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
-        if (_inheritorsMap.TryGetValue(baseTypeName, out var directInheritors))
+        if (TryGetInheritors(baseTypeName, out var directInheritors))
         {
             foreach (var item in directInheritors) results.Add(item);
         }
 
-        if (_shortTypeMap.TryGetValue(baseTypeName, out var fullNames))
+        if (TryGetShortType(baseTypeName, out var fullNames))
         {
             foreach (var fullName in fullNames)
             {
-                if (_inheritorsMap.TryGetValue(fullName, out var inheritors))
+                if (TryGetInheritors(fullName, out var inheritors))
                 {
                     foreach (var item in inheritors) results.Add(item);
                 }
@@ -106,7 +177,7 @@ public class SourceIndexer
         var shortNameCandidate = baseTypeName.Contains('.') ? baseTypeName.Split('.').Last() : baseTypeName;
         if (shortNameCandidate != baseTypeName)
         {
-            if (_inheritorsMap.TryGetValue(shortNameCandidate, out var shortInheritors))
+            if (TryGetInheritors(shortNameCandidate, out var shortInheritors))
             {
                 foreach (var item in shortInheritors) results.Add(item);
             }
@@ -119,8 +190,8 @@ public class SourceIndexer
     {
         var chain = new List<(string Child, string Parent)>();
         
-        string? current = _typeMap.ContainsKey(typeName) ? typeName : null;
-        if (current == null && _shortTypeMap.TryGetValue(typeName, out var fullNames))
+        string? current = ContainsType(typeName) ? typeName : null;
+        if (current == null && TryGetShortType(typeName, out var fullNames))
         {
             current = fullNames.FirstOrDefault();
         }
@@ -132,8 +203,8 @@ public class SourceIndexer
             if (chain.Any(x => x.Child == current)) break;
             chain.Add((current, parent));
             
-            current = _typeMap.ContainsKey(parent) ? parent : null;
-            if (current == null && _shortTypeMap.TryGetValue(parent, out var parentFullNames))
+            current = ContainsType(parent) ? parent : null;
+            if (current == null && TryGetShortType(parent, out var parentFullNames))
             {
                 current = parentFullNames.FirstOrDefault();
             }
@@ -145,17 +216,31 @@ public class SourceIndexer
 
     public List<string> GetPathsByType(string typeName)
     {
-        if (_typeMap.TryGetValue(typeName, out var paths)) return paths.ToList();
-        if (_shortTypeMap.TryGetValue(typeName, out var fullNames))
+        var files = GetTypeFiles(typeName);
+        if (files.Count > 0) return files.ToList();
+        if (TryGetShortType(typeName, out var fullNames))
         {
             return fullNames.Distinct()
-                .SelectMany(fn => _typeMap.TryGetValue(fn, out var p) ? p : Enumerable.Empty<string>()).ToList();
+                .SelectMany(fn => GetTypeFiles(fn)).ToList();
         }
         return new List<string>();
     }
 
     public List<string> Search(string query)
     {
+        var source = _frozenIndex ?? (IReadOnlyDictionary<string, string[]>?)null;
+        if (source != null)
+        {
+            return source
+                .Select(kv => new { Key = kv.Key, Value = kv.Value, Score = FuzzyMatcher.CalculateFuzzyScore(kv.Key, query) })
+                .Where(x => x.Score > 0)
+                .OrderByDescending(x => x.Score)
+                .ThenBy(x => x.Key.Length)
+                .SelectMany(x => x.Value)
+                .Distinct()
+                .Take(30)
+                .ToList();
+        }
         return _index
             .Select(kv => new { Key = kv.Key, Value = kv.Value, Score = FuzzyMatcher.CalculateFuzzyScore(kv.Key, query) })
             .Where(x => x.Score > 0)
@@ -172,22 +257,27 @@ public class SourceIndexer
         try
         {
             var members = RoslynHelper.ExtractAllMembers(filePath);
-            foreach (var (typeName, memberName, memberType) in members)
-            {
-                var words = FuzzyMatcher.SplitIntoWords(memberName);
-                foreach (var word in words)
-                {
-                    if (word.Length >= 2)
-                    {
-                        _memberIndex.GetOrAdd(word.ToLowerInvariant(), _ => new ConcurrentBag<(string, string, string, string)>())
-                            .Add((typeName, memberName, memberType, filePath));
-                    }
-                }
-                _memberIndex.GetOrAdd(memberName.ToLowerInvariant(), _ => new ConcurrentBag<(string, string, string, string)>())
-                    .Add((typeName, memberName, memberType, filePath));
-            }
+            IndexMembersFromList(members, filePath);
         }
         catch { }
+    }
+
+    private void IndexMembersFromList(List<(string TypeName, string MemberName, string MemberType)> members, string filePath)
+    {
+        foreach (var (typeName, memberName, memberType) in members)
+        {
+            var words = FuzzyMatcher.SplitIntoWords(memberName);
+            foreach (var word in words)
+            {
+                if (word.Length >= 2)
+                {
+                    _memberIndex.GetOrAdd(word.ToLowerInvariant(), _ => new ConcurrentBag<(string, string, string, string)>())
+                        .Add((typeName, memberName, memberType, filePath));
+                }
+            }
+            _memberIndex.GetOrAdd(memberName.ToLowerInvariant(), _ => new ConcurrentBag<(string, string, string, string)>())
+                .Add((typeName, memberName, memberType, filePath));
+        }
     }
 
     private void IndexNgrams(string name)
@@ -215,9 +305,15 @@ public class SourceIndexer
 
             foreach (var ngram in queryNgrams)
             {
-                if (_ngramIndex.TryGetValue(ngram, out var namesBag))
+                IEnumerable<string>? names = null;
+                if (_frozenNgramIndex != null && _frozenNgramIndex.TryGetValue(ngram, out var frozenNames))
+                    names = frozenNames;
+                else if (_ngramIndex.TryGetValue(ngram, out var namesBag))
+                    names = namesBag.Distinct();
+                    
+                if (names != null)
                 {
-                    foreach (var name in namesBag.Distinct())
+                    foreach (var name in names)
                         candidateScores[name] = candidateScores.GetValueOrDefault(name) + 1;
                 }
             }
@@ -249,13 +345,24 @@ public class SourceIndexer
     {
         if (keywords == null || keywords.Length == 0) return new List<(string, string, string, string, double)>();
         var matchedMembers = new Dictionary<(string, string, string, string), int>();
+        
+        // Use frozen index if available
+        var memberKeys = _frozenMemberIndex != null 
+            ? (IEnumerable<string>)_frozenMemberIndex.Keys 
+            : _memberIndex.Keys;
 
         foreach (var keyword in keywords)
         {
             if (string.IsNullOrWhiteSpace(keyword) || keyword.Length < 2) continue;
             var keyLower = keyword.ToLowerInvariant();
 
-            if (_memberIndex.TryGetValue(keyLower, out var members))
+            IEnumerable<(string TypeName, string MemberName, string MemberType, string FilePath)>? members = null;
+            if (_frozenMemberIndex != null && _frozenMemberIndex.TryGetValue(keyLower, out var frozenMembers))
+                members = frozenMembers;
+            else if (_memberIndex.TryGetValue(keyLower, out var bagMembers))
+                members = bagMembers;
+                
+            if (members != null)
             {
                 foreach (var member in members)
                 {
@@ -264,12 +371,48 @@ public class SourceIndexer
                 }
             }
 
-            var fuzzyMatches = _memberIndex.Keys.Where(k => FuzzyMatcher.CalculateFuzzyScore(k, keyLower) >= 60.0).Take(10);
+            // Use prefix matching + n-gram candidate reduction instead of exhaustive linear scan
+            IEnumerable<string> fuzzyCandidates;
+            if (keyLower.Length >= 3)
+            {
+                var ngrams = FuzzyMatcher.GenerateNgrams(keyLower, 2).Distinct().ToList();
+                var candidateSet = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                foreach (var ngram in ngrams)
+                {
+                    foreach (var mk in memberKeys)
+                    {
+                        if (mk.Contains(ngram, StringComparison.OrdinalIgnoreCase))
+                            candidateSet.Add(mk);
+                        if (candidateSet.Count >= 200) break;
+                    }
+                    if (candidateSet.Count >= 200) break;
+                }
+                fuzzyCandidates = candidateSet;
+            }
+            else
+            {
+                // For very short keywords, use prefix match only
+                fuzzyCandidates = memberKeys.Where(k => k.StartsWith(keyLower, StringComparison.OrdinalIgnoreCase)).Take(50);
+            }
+            
+            var fuzzyMatches = fuzzyCandidates
+                .Select(k => (Key: k, Score: FuzzyMatcher.CalculateFuzzyScore(k, keyLower)))
+                .Where(x => x.Score >= 60.0)
+                .OrderByDescending(x => x.Score)
+                .Take(10)
+                .Select(x => x.Key);
+                
             foreach (var fuzzyKey in fuzzyMatches)
             {
-                if (_memberIndex.TryGetValue(fuzzyKey, out var fuzzyMembers))
+                IEnumerable<(string TypeName, string MemberName, string MemberType, string FilePath)>? fuzzyMemberList = null;
+                if (_frozenMemberIndex != null && _frozenMemberIndex.TryGetValue(fuzzyKey, out var frozenFuzzy))
+                    fuzzyMemberList = frozenFuzzy;
+                else if (_memberIndex.TryGetValue(fuzzyKey, out var bagFuzzy))
+                    fuzzyMemberList = bagFuzzy;
+                    
+                if (fuzzyMemberList != null)
                 {
-                    foreach (var member in fuzzyMembers)
+                    foreach (var member in fuzzyMemberList)
                     {
                         var key = (member.TypeName, member.MemberName, member.MemberType, member.FilePath);
                         matchedMembers[key] = matchedMembers.GetValueOrDefault(key) + 1;
@@ -302,7 +445,9 @@ public class SourceIndexer
     {
         var results = new ConcurrentBag<(string Path, string Preview)>();
         var regex = new Regex(pattern, (ignoreCase ? RegexOptions.IgnoreCase : RegexOptions.None) | RegexOptions.Compiled, TimeSpan.FromSeconds(1));
-        var allFiles = _index.Values.SelectMany(x => x).Distinct().ToList();
+        var allFiles = _frozenIndex != null 
+            ? _frozenIndex.Values.SelectMany(x => x).ToList()
+            : _index.Values.SelectMany(x => x).Distinct().ToList();
 
         int globalCount = 0;
         int processedCount = 0;
@@ -359,6 +504,15 @@ public class SourceIndexer
         return (results.Take(100).ToList(), wasTruncated || finalCount >= 100);
     }
 
-    public string? GetPath(string name) => _index.TryGetValue(name, out var paths) ? paths.FirstOrDefault() : null;
-    public IEnumerable<string> GetAllFiles() => _index.Values.SelectMany(x => x).Distinct();
+    public string? GetPath(string name)
+    {
+        if (_frozenIndex != null && _frozenIndex.TryGetValue(name, out var frozen)) return frozen.FirstOrDefault();
+        return _index.TryGetValue(name, out var paths) ? paths.FirstOrDefault() : null;
+    }
+    
+    public IEnumerable<string> GetAllFiles()
+    {
+        if (_frozenIndex != null) return _frozenIndex.Values.SelectMany(x => x);
+        return _index.Values.SelectMany(x => x).Distinct();
+    }
 }

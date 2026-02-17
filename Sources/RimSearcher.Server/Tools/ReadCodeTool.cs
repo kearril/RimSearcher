@@ -6,10 +6,17 @@ namespace RimSearcher.Server.Tools;
 
 public class ReadCodeTool : ITool
 {
+    private readonly SourceIndexer _sourceIndexer;
+
+    public ReadCodeTool(SourceIndexer sourceIndexer)
+    {
+        _sourceIndexer = sourceIndexer;
+    }
+
     public string Name => "rimworld-searcher__read_code";
 
     public string Description =>
-        "Extracts C# source code from files. Provide 'methodName' to extract a specific method body (recommended). Or use 'startLine' and 'lineCount' for raw line-based reading (defaults to 150 lines). Essential for understanding implementation details of Comps, Workers, and game logic.";
+        "Extracts C# source code from files. Provide 'methodName' to extract a specific member (method, property, constructor, indexer, operator). Use 'extractClass' to extract an entire class body. Or use 'startLine' and 'lineCount' for raw line-based reading (defaults to 150 lines). Essential for understanding implementation details of Comps, Workers, and game logic.";
 
     public string? Icon => "lucide:file-code";
 
@@ -23,12 +30,17 @@ public class ReadCodeTool : ITool
             {
                 type = "string",
                 description =
-                    "The specific method implementation to read. Example: 'CompTick' or 'DoEffect'."
+                    "The member to extract: method ('CompTick'), property ('Label'), constructor (class name or '.ctor'), indexer ('this'), or operator ('+')."
             },
             className = new
             {
                 type = "string",
-                description = "Optional: The class name to resolve ambiguity if multiple classes in the file have the same method name."
+                description = "Optional: The class name to resolve ambiguity if multiple classes have the same member name."
+            },
+            extractClass = new
+            {
+                type = "string",
+                description = "Optional: Extract the entire class/struct/interface body by name. Example: 'CompShield'."
             },
             startLine = new
             {
@@ -49,34 +61,52 @@ public class ReadCodeTool : ITool
         var path = args.GetProperty("path").GetString();
         if (string.IsNullOrEmpty(path)) return new ToolResult("Path cannot be empty.", true);
 
-        if (!PathSecurity.IsPathSafe(path))
-            return new ToolResult("Access Denied: Path is outside allowed source directories.", true);
-        if (!File.Exists(path)) return new ToolResult("File does not exist.", true);
+        // Auto-resolve: if path is not absolute or file doesn't exist, try to resolve via index
+        var resolvedPath = ResolvePath(path);
+        if (resolvedPath == null)
+            return new ToolResult($"File not found: '{Path.GetFileName(path)}'. Use 'locate' to find the correct file first.", true);
 
+        path = resolvedPath;
         cancellationToken.ThrowIfCancellationRequested();
-        if (args.TryGetProperty("methodName", out var mProp))
-        {
-            var methodName = mProp.GetString();
-            if (!string.IsNullOrEmpty(methodName))
-            {
-                var className = args.TryGetProperty("className", out var cProp) ? cProp.GetString() : null;
-                var body = await RoslynHelper.GetMethodBodyAsync(path, methodName, className);
-                if (string.IsNullOrEmpty(body) || body.Contains("Method not found"))
-                {
-                    return new ToolResult(
-                        $"Method '{methodName}' not found in {Path.GetFileName(path)}. Use inspect tool to see available methods.",
-                        true);
-                }
-
-                return new ToolResult($"```csharp\n// {methodName}\n{body}\n```");
-            }
-        }
-
-        int startLine = args.TryGetProperty("startLine", out var sProp) ? sProp.GetInt32() : 0;
-        int lineCount = args.TryGetProperty("lineCount", out var lProp) ? lProp.GetInt32() : 150;
 
         try
         {
+            // Extract entire class body
+            if (args.TryGetProperty("extractClass", out var ecProp))
+            {
+                var extractClassName = ecProp.GetString();
+                if (!string.IsNullOrEmpty(extractClassName))
+                {
+                    var classBody = await RoslynHelper.GetClassBodyAsync(path, extractClassName);
+                    if (string.IsNullOrEmpty(classBody) || classBody.Contains("not found"))
+                        return new ToolResult($"Class '{extractClassName}' not found in {Path.GetFileName(path)}. Use inspect tool to verify.", true);
+                    return new ToolResult($"```csharp\n{classBody}\n```");
+                }
+            }
+
+            // Extract specific member (method, property, constructor, etc.)
+            if (args.TryGetProperty("methodName", out var mProp))
+            {
+                var methodName = mProp.GetString();
+                if (!string.IsNullOrEmpty(methodName))
+                {
+                    var className = args.TryGetProperty("className", out var cProp) ? cProp.GetString() : null;
+                    var body = await RoslynHelper.GetMemberBodyAsync(path, methodName, className);
+                    if (string.IsNullOrEmpty(body) || body.Contains("not found"))
+                    {
+                        return new ToolResult(
+                            $"Member '{methodName}' not found in {Path.GetFileName(path)}. Use inspect tool to see available members.",
+                            true);
+                    }
+
+                    return new ToolResult($"```csharp\n// {methodName}\n{body}\n```");
+                }
+            }
+
+            // Fall back to raw line-based reading
+            int startLine = args.TryGetProperty("startLine", out var sProp) ? sProp.GetInt32() : 0;
+            int lineCount = args.TryGetProperty("lineCount", out var lProp) ? lProp.GetInt32() : 150;
+
             var allLines = File.ReadAllLines(path);
             int totalLines = allLines.Length;
 
@@ -102,5 +132,29 @@ public class ReadCodeTool : ITool
         {
             return new ToolResult($"Read failed: {ex.Message}", true);
         }
+    }
+
+    private string? ResolvePath(string input)
+    {
+        // 1. Absolute path that exists and is safe
+        if (Path.IsPathRooted(input) && File.Exists(input) && PathSecurity.IsPathSafe(input))
+            return input;
+
+        // 2. Index key is FileNameWithoutExtension — try that first
+        var nameNoExt = Path.GetFileNameWithoutExtension(input);
+        var indexPath = _sourceIndexer.GetPath(nameNoExt);
+        if (indexPath != null && File.Exists(indexPath))
+            return indexPath;
+
+        // 3. Also try the raw file name (in case index was built differently)
+        var rawName = Path.GetFileName(input);
+        if (rawName != nameNoExt)
+        {
+            indexPath = _sourceIndexer.GetPath(rawName);
+            if (indexPath != null && File.Exists(indexPath))
+                return indexPath;
+        }
+
+        return null;
     }
 }

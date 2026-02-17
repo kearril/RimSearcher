@@ -2,6 +2,7 @@ using System.Text;
 using System.Text.Json;
 using System.Xml.Linq;
 using RimSearcher.Core;
+using RimSearcher.Server;
 
 namespace RimSearcher.Server.Tools;
 
@@ -9,6 +10,21 @@ public class InspectTool : ITool
 {
     private readonly SourceIndexer _sourceIndexer;
     private readonly DefIndexer _defIndexer;
+
+    private static readonly HashSet<string> ClassTags = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "thingClass", "workerClass", "jobClass", "hediffClass", "thoughtClass",
+        "compClass", "incidentClass", "interactionWorkerClass", "mentalStateHandlerClass",
+        "ritualBehaviorClass", "skillGiverClass", "worldObjectClass", "lifeStageWorkerClass",
+        "traitWorkerClass", "selectionWorkerClass", "modExtension", "giverClass",
+        "soundClass", "damageWorkerClass", "linkDrawerClass", "graphicClass",
+        "blueprintClass", "scattererClass", "questClass", "verbClass",
+        "roomRoleWorker", "statWorker", "moteClass", "thinkTree",
+        "driverClass", "lordJob", "tabWindowClass", "pageClass", "comparerClass",
+        "drawStyleType", "fleckSystemClass", "subEffecterClass", "needClass",
+        "taleClass", "triggerClass", "inheritanceWorkerOverrideClass", "workerType",
+        "eventClass", "worldDrawLayer", "designatorType", "scenPartClass", "stateClass"
+    };
 
     public InspectTool(SourceIndexer sourceIndexer, DefIndexer defIndexer)
     {
@@ -58,7 +74,14 @@ public class InspectTool : ITool
 
             sb.AppendLine($"File: `{def.FilePath}`");
 
-            var resolvedXmlStr = await XmlInheritanceHelper.ResolveDefXmlAsync(name, _defIndexer);
+            var resolvedXml = await XmlInheritanceHelper.ResolveDefXmlElementAsync(name, _defIndexer);
+            if (resolvedXml == null)
+            {
+                sb.AppendLine("\n**Resolved XML:** Failed to load Def XML");
+                return new ToolResult(sb.ToString());
+            }
+
+            var resolvedXmlStr = resolvedXml.ToString();
             sb.AppendLine("\n**Resolved XML:**");
 
             var xmlLines = resolvedXmlStr.Split('\n');
@@ -78,30 +101,15 @@ public class InspectTool : ITool
                 sb.AppendLine("```");
             }
 
+            // Extract linked C# types directly from the resolved XElement (no re-parse)
             try
             {
-                var xdoc = XDocument.Parse(resolvedXmlStr);
-                var classTags = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
-                {
-                    "thingClass", "workerClass", "jobClass", "hediffClass", "thoughtClass",
-                    "compClass", "incidentClass", "interactionWorkerClass", "mentalStateHandlerClass",
-                    "ritualBehaviorClass", "skillGiverClass", "worldObjectClass", "lifeStageWorkerClass",
-                    "traitWorkerClass", "selectionWorkerClass", "modExtension", "giverClass",
-                    "soundClass", "damageWorkerClass", "linkDrawerClass", "graphicClass",
-                    "blueprintClass", "scattererClass", "questClass", "verbClass",
-                    "roomRoleWorker", "statWorker", "moteClass", "thinkTree",
-                    "driverClass", "lordJob", "tabWindowClass", "pageClass", "comparerClass",
-                    "drawStyleType", "fleckSystemClass", "subEffecterClass", "needClass",
-                    "taleClass", "triggerClass", "inheritanceWorkerOverrideClass", "workerType",
-                    "eventClass", "worldDrawLayer", "designatorType", "scenPartClass", "stateClass"
-                };
-
                 var foundTypes = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-                foreach (var el in xdoc.Descendants())
+                foreach (var el in resolvedXml.Descendants())
                 {
                     cancellationToken.ThrowIfCancellationRequested();
 
-                    if (classTags.Contains(el.Name.LocalName) ||
+                    if (ClassTags.Contains(el.Name.LocalName) ||
                         el.Name.LocalName.EndsWith("Class", StringComparison.OrdinalIgnoreCase) ||
                         el.Name.LocalName.EndsWith("Worker", StringComparison.OrdinalIgnoreCase))
                     {
@@ -133,8 +141,10 @@ public class InspectTool : ITool
                         sb.AppendLine($"  ... +{foundTypes.Count - 10} more types (use locate to find them)");
                 }
             }
-            catch
+            catch (OperationCanceledException) { throw; }
+            catch (Exception ex)
             {
+                await ServerLogger.Debug($"InspectTool: Failed to extract linked types from {name}: {ex.Message}");
             }
 
             return new ToolResult(sb.ToString());

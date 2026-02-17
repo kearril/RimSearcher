@@ -23,7 +23,12 @@ else if (!hasPaths)
     await ServerLogger.Warning($"No source paths defined in config: {configPath}");
 }
 
-PathSecurity.Initialize(appConfig.CsharpSourcePaths.Concat(appConfig.XmlSourcePaths));
+PathSecurity.Initialize(appConfig.CsharpSourcePaths.Concat(appConfig.XmlSourcePaths), enabled: !appConfig.SkipPathSecurity);
+
+if (appConfig.SkipPathSecurity)
+{
+    await ServerLogger.Info("Path security checks disabled via config");
+}
 
 var indexer = new SourceIndexer();
 var defIndexer = new DefIndexer(Microsoft.Extensions.Logging.Abstractions.NullLogger.Instance);
@@ -61,6 +66,9 @@ foreach (var path in appConfig.XmlSourcePaths)
 
 if (totalCsharpPaths > 0 || totalXmlPaths > 0)
 {
+    // Freeze indices for optimized read-only access
+    indexer.FreezeIndex();
+    defIndexer.FreezeIndex();
     await ServerLogger.Info($"Indexed {totalCsharpPaths} C# paths and {totalXmlPaths} XML paths");
 }
 
@@ -79,12 +87,18 @@ server.RegisterTool(new ListDirectoryTool());
 server.RegisterTool(new LocateTool(indexer, defIndexer));
 server.RegisterTool(new InspectTool(indexer, defIndexer));
 server.RegisterTool(new TraceTool(indexer));
-server.RegisterTool(new ReadCodeTool());
+server.RegisterTool(new ReadCodeTool(indexer));
 server.RegisterTool(new SearchRegexTool(indexer));
 
 if (isLoaded && hasPaths)
 {
     await ServerLogger.Info("RimSearcher MCP Server started...");
+}
+
+// Fire-and-forget update check (non-blocking, errors silently ignored)
+if (appConfig.CheckUpdates)
+{
+    _ = Task.Run(async () => await UpdateChecker.CheckAsync());
 }
 
 await server.RunAsync();

@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using System.Collections.Frozen;
 using System.Text.RegularExpressions;
 using System.Xml;
 using System.Xml.Linq;
@@ -8,8 +9,11 @@ namespace RimSearcher.Core;
 
 public record DefLocation(string FilePath, string DefType, string DefName, string? ParentName, string? Label, bool IsAbstract = false);
 
-public class DefIndexer
+public partial class DefIndexer
 {
+    [GeneratedRegex(@"\W+")]
+    private static partial Regex WordSplitRegex();
+    
     private readonly ILogger? _logger;
     private readonly ConcurrentDictionary<string, DefLocation> _defNameIndex = new(StringComparer.OrdinalIgnoreCase);
     private readonly ConcurrentDictionary<string, DefLocation> _parentNameIndex = new(StringComparer.OrdinalIgnoreCase);
@@ -22,10 +26,29 @@ public class DefIndexer
 
     private readonly ConcurrentDictionary<string, byte> _processedFiles = new(StringComparer.OrdinalIgnoreCase);
     private static readonly XmlReaderSettings SafeSettings = new() { DtdProcessing = DtdProcessing.Prohibit };
+    
+    // Frozen indices for read-optimized access
+    private FrozenDictionary<string, DefLocation>? _frozenDefNameIndex;
+    private FrozenDictionary<string, DefLocation>? _frozenParentNameIndex;
+    private FrozenDictionary<string, DefLocation[]>? _frozenLabelIndex;
+    private FrozenDictionary<string, (DefLocation Location, string FieldPath)[]>? _frozenFieldContentIndex;
 
     public DefIndexer(ILogger? logger = null)
     {
         _logger = logger;
+    }
+    
+    /// <summary>
+    /// Freezes all indices for read-optimized access. Call after all Scan() calls complete.
+    /// </summary>
+    public void FreezeIndex()
+    {
+        _frozenDefNameIndex = _defNameIndex.ToFrozenDictionary(StringComparer.OrdinalIgnoreCase);
+        _frozenParentNameIndex = _parentNameIndex.ToFrozenDictionary(StringComparer.OrdinalIgnoreCase);
+        _frozenLabelIndex = _labelIndex.ToFrozenDictionary(
+            kv => kv.Key, kv => kv.Value.Distinct().ToArray(), StringComparer.OrdinalIgnoreCase);
+        _frozenFieldContentIndex = _fieldContentIndex.ToFrozenDictionary(
+            kv => kv.Key, kv => kv.Value.Distinct().ToArray(), StringComparer.OrdinalIgnoreCase);
     }
 
     public void Scan(string rootPath)
@@ -61,57 +84,38 @@ public class DefIndexer
             
             try
             {
-                using var stream = new FileStream(internedFile, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
-                using var reader = XmlReader.Create(stream, SafeSettings);
-
-                if (!reader.ReadToFollowing("Defs")) return;
+                // Single-pass: load XDocument once for both metadata extraction and field content indexing
+                var doc = GetOrLoadDocument(internedFile);
+                if (doc.Root == null || doc.Root.Name.LocalName != "Defs") return;
 
                 int nodeIdx = 0;
-                while (reader.Read())
+                foreach (var defElement in doc.Root.Elements())
                 {
-                    if (reader.NodeType == XmlNodeType.Element && reader.Depth == 1)
+                    nodeIdx++;
+                    string defType = defElement.Name.LocalName;
+                    string? nameAttr = defElement.Attribute("Name")?.Value;
+                    string? parentNameAttr = defElement.Attribute("ParentName")?.Value;
+                    string? abstractAttr = defElement.Attribute("Abstract")?.Value;
+                    bool isAbstract = string.Equals(abstractAttr, "true", StringComparison.OrdinalIgnoreCase);
+
+                    string? defName = defElement.Element("defName")?.Value;
+                    string? label = defElement.Element("label")?.Value;
+
+                    string identifier = defName ?? nameAttr ?? $"[Unnamed_{defType}_{nodeIdx}]";
+                    var loc = new DefLocation(internedFile, defType, identifier, parentNameAttr, label, isAbstract);
+
+                    if (!string.IsNullOrEmpty(defName)) _defNameIndex[defName] = loc;
+                    if (!string.IsNullOrEmpty(nameAttr)) _parentNameIndex[nameAttr] = loc;
+                    if (!string.IsNullOrEmpty(label))
                     {
-                        nodeIdx++;
-                        string defType = reader.LocalName;
-                        string? nameAttr = reader.GetAttribute("Name");
-                        string? parentNameAttr = reader.GetAttribute("ParentName");
-                        string? abstractAttr = reader.GetAttribute("Abstract");
-                        bool isAbstract = string.Equals(abstractAttr, "true", StringComparison.OrdinalIgnoreCase);
-
-                        string? defName = null;
-                        string? label = null;
-
-                        if (!reader.IsEmptyElement)
-                        {
-                            int defDepth = reader.Depth;
-                            while (reader.Read() && reader.Depth > defDepth)
-                            {
-                                if (reader.NodeType == XmlNodeType.Element)
-                                {
-                                    if (reader.LocalName == "defName")
-                                        defName = reader.ReadElementContentAsString();
-                                    else if (reader.LocalName == "label")
-                                        label = reader.ReadElementContentAsString();
-                                }
-                            }
-                        }
-
-                        string identifier = defName ?? nameAttr ?? $"[Unnamed_{defType}_{nodeIdx}]";
-                        var loc = new DefLocation(internedFile, defType, identifier, parentNameAttr, label, isAbstract);
-
-                        if (!string.IsNullOrEmpty(defName)) _defNameIndex[defName] = loc;
-                        if (!string.IsNullOrEmpty(nameAttr)) _parentNameIndex[nameAttr] = loc;
-                        if (!string.IsNullOrEmpty(label))
-                        {
-                            var bag = _labelIndex.GetOrAdd(label, _ => new ConcurrentBag<DefLocation>());
-                            bag.Add(loc);
-                        }
-
-                        Interlocked.Increment(ref totalParsed);
+                        _labelIndex.GetOrAdd(label, _ => new ConcurrentBag<DefLocation>()).Add(loc);
                     }
-                }
 
-                IndexFieldContents(internedFile);
+                    // Index field contents in the same pass
+                    IndexElementRecursive(defElement, loc, "", 0);
+
+                    Interlocked.Increment(ref totalParsed);
+                }
             }
             catch { }
         });
@@ -127,30 +131,6 @@ public class DefIndexer
         using var stream = new FileStream(filePath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
         using var reader = XmlReader.Create(stream, SafeSettings);
         return XDocument.Load(reader);
-    }
-
-    private void IndexFieldContents(string filePath)
-    {
-        try
-        {
-            var doc = GetOrLoadDocument(filePath);
-            if (doc.Root == null) return;
-
-            foreach (var defElement in doc.Root.Elements())
-            {
-                var defName = defElement.Element("defName")?.Value ?? defElement.Attribute("Name")?.Value;
-                if (string.IsNullOrEmpty(defName)) continue;
-
-                if (!_defNameIndex.TryGetValue(defName, out var location))
-                {
-                    if (!_parentNameIndex.TryGetValue(defName, out location))
-                        continue;
-                }
-
-                IndexElementRecursive(defElement, location, "", 0);
-            }
-        }
-        catch { }
     }
 
     private void IndexElementRecursive(XElement element, DefLocation location, string pathPrefix, int depth = 0)
@@ -171,7 +151,7 @@ public class DefIndexer
         if (!element.HasElements && !string.IsNullOrWhiteSpace(element.Value))
         {
             var value = element.Value.Trim();
-            var words = Regex.Split(value, @"\W+")
+            var words = WordSplitRegex().Split(value)
                 .Where(w => w.Length >= 3)
                 .Select(w => w.ToLowerInvariant())
                 .Distinct();
@@ -191,13 +171,16 @@ public class DefIndexer
 
     public List<(DefLocation Location, double Score)> FuzzySearch(string query)
     {
-        var scoredResults = _defNameIndex
+        var defNameSource = (IEnumerable<KeyValuePair<string, DefLocation>>?)_frozenDefNameIndex ?? _defNameIndex;
+        var parentNameSource = (IEnumerable<KeyValuePair<string, DefLocation>>?)_frozenParentNameIndex ?? _parentNameIndex;
+        
+        var scoredResults = defNameSource
             .Select(kv => new
             {
                 Loc = kv.Value,
                 Score = FuzzyMatcher.CalculateFuzzyScore(kv.Key, query) * 1.2 * (kv.Value.IsAbstract ? 0.5 : 1.0)
             })
-            .Concat(_parentNameIndex.Select(kv => new
+            .Concat(parentNameSource.Select(kv => new
             {
                 Loc = kv.Value,
                 Score = FuzzyMatcher.CalculateFuzzyScore(kv.Key, query) * 1.0 * (kv.Value.IsAbstract ? 0.5 : 1.0)
@@ -234,7 +217,13 @@ public class DefIndexer
 
             var keyLower = keyword.ToLowerInvariant();
 
-            if (_fieldContentIndex.TryGetValue(keyLower, out var matches))
+            IEnumerable<(DefLocation Location, string FieldPath)>? matches = null;
+            if (_frozenFieldContentIndex != null && _frozenFieldContentIndex.TryGetValue(keyLower, out var frozenMatches))
+                matches = frozenMatches;
+            else if (_fieldContentIndex.TryGetValue(keyLower, out var bagMatches))
+                matches = bagMatches;
+
+            if (matches != null)
             {
                 foreach (var (location, fieldPath) in matches)
                 {
@@ -261,10 +250,22 @@ public class DefIndexer
             .ToList();
     }
 
-    public DefLocation? GetDef(string name) => _defNameIndex.TryGetValue(name, out var loc)
-        ? loc
-        : (_parentNameIndex.TryGetValue(name, out var locP) ? locP : null);
+    public DefLocation? GetDef(string name)
+    {
+        if (_frozenDefNameIndex != null)
+        {
+            if (_frozenDefNameIndex.TryGetValue(name, out var loc)) return loc;
+            if (_frozenParentNameIndex != null && _frozenParentNameIndex.TryGetValue(name, out var locP)) return locP;
+            return null;
+        }
+        return _defNameIndex.TryGetValue(name, out var loc2)
+            ? loc2
+            : (_parentNameIndex.TryGetValue(name, out var locP2) ? locP2 : null);
+    }
 
-    public DefLocation? GetParent(string parentName) =>
-        _parentNameIndex.TryGetValue(parentName, out var loc) ? loc : null;
+    public DefLocation? GetParent(string parentName)
+    {
+        if (_frozenParentNameIndex != null && _frozenParentNameIndex.TryGetValue(parentName, out var loc)) return loc;
+        return _parentNameIndex.TryGetValue(parentName, out var loc2) ? loc2 : null;
+    }
 }

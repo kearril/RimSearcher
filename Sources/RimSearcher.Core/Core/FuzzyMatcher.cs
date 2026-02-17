@@ -2,8 +2,11 @@ using System.Text.RegularExpressions;
 
 namespace RimSearcher.Core;
 
-public static class FuzzyMatcher
+public static partial class FuzzyMatcher
 {
+    [System.Text.RegularExpressions.GeneratedRegex(@"[_\.\-\s]+")]
+    private static partial Regex WordSplitRegex();
+
     public static double CalculateFuzzyScore(string text, string query)
     {
         if (string.IsNullOrEmpty(text) || string.IsNullOrEmpty(query))
@@ -103,7 +106,7 @@ public static class FuzzyMatcher
     public static List<string> SplitIntoWords(string text)
     {
         if (string.IsNullOrEmpty(text)) return new List<string>();
-        var parts = Regex.Split(text, @"[_\.\-\s]+");
+        var parts = WordSplitRegex().Split(text);
         var result = new List<string>();
 
         foreach (var part in parts)

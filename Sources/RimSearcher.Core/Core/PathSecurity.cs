@@ -5,9 +5,12 @@ namespace RimSearcher.Core;
 public static class PathSecurity
 {
     private static readonly List<string> AllowedRoots = new();
+    private static bool _enabled = true;
 
-    public static void Initialize(IEnumerable<string> paths)
+    public static void Initialize(IEnumerable<string> paths, bool enabled = true)
     {
+        _enabled = enabled;
+        
         foreach (var path in paths)
         {
             if (string.IsNullOrEmpty(path)) continue;
@@ -22,6 +25,7 @@ public static class PathSecurity
 
     public static bool IsPathSafe(string requestedPath)
     {
+        if (!_enabled) return true;
         if (string.IsNullOrEmpty(requestedPath)) return false;
 
         try

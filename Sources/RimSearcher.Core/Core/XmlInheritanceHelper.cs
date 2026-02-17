@@ -22,10 +22,14 @@ public static class XmlInheritanceHelper
         "startingResearchProjects", "addDesignators", "addDesignatorGroups"
     };
 
-    public static async Task<string> ResolveDefXmlAsync(string defName, DefIndexer indexer)
+    /// <summary>
+    /// Resolves XML inheritance and returns the merged XElement directly.
+    /// Returns null if the def is not found or loading fails.
+    /// </summary>
+    public static async Task<XElement?> ResolveDefXmlElementAsync(string defName, DefIndexer indexer)
     {
         var targetLoc = indexer.GetDef(defName);
-        if (targetLoc == null) return "Def not found";
+        if (targetLoc == null) return null;
 
         var hierarchy = new Stack<XElement>();
         var currentLoc = targetLoc;
@@ -68,7 +72,7 @@ public static class XmlInheritanceHelper
             }
         }
 
-        if (hierarchy.Count == 0) return "Failed to load Def XML";
+        if (hierarchy.Count == 0) return null;
 
         XElement result = new XElement(hierarchy.Peek().Name);
         while (hierarchy.Count > 0) MergeXml(result, hierarchy.Pop());
@@ -86,7 +90,16 @@ public static class XmlInheritanceHelper
         if (defNameEl != null) result.AddFirst(defNameEl);
 
         CleanupMetadata(result);
-        return result.ToString();
+        return result;
+    }
+
+    /// <summary>
+    /// Legacy convenience method that returns the resolved XML as a string.
+    /// </summary>
+    public static async Task<string> ResolveDefXmlAsync(string defName, DefIndexer indexer)
+    {
+        var element = await ResolveDefXmlElementAsync(defName, indexer);
+        return element?.ToString() ?? "Def not found";
     }
 
     private static void CleanupMetadata(XElement element)
