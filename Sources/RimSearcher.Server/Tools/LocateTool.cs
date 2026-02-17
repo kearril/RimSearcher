@@ -53,7 +53,7 @@ public class LocateTool : ITool
         if (query.TypeFilter != null || (string.IsNullOrEmpty(query.MethodFilter) && string.IsNullOrEmpty(query.FieldFilter) && string.IsNullOrEmpty(query.DefFilter)))
         {
             var typeSearchTerm = query.TypeFilter ?? QueryParser.GetCombinedSearchTerm(query);
-            var types = _sourceIndexer.FuzzySearchTypes(typeSearchTerm);
+            var types = CollapseTypeAliases(_sourceIndexer.FuzzySearchTypes(typeSearchTerm));
 
             if (types.Count > 0)
             {
@@ -163,5 +163,39 @@ public class LocateTool : ITool
         }
 
         return new ToolResult(sb.ToString());
+    }
+
+    private static List<(string TypeName, double Score)> CollapseTypeAliases(List<(string TypeName, double Score)> types)
+    {
+        var fullNameByShortName = types
+            .Where(t => t.TypeName.Contains('.'))
+            .GroupBy(
+                t => t.TypeName[(t.TypeName.LastIndexOf('.') + 1)..],
+                StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(
+                g => g.Key,
+                g => g
+                    .OrderByDescending(x => x.Score)
+                    .ThenByDescending(x => x.TypeName.Length)
+                    .First()
+                    .TypeName,
+                StringComparer.OrdinalIgnoreCase);
+
+        return types
+            .Select(t =>
+            {
+                var canonicalName = t.TypeName.Contains('.')
+                    ? t.TypeName
+                    : fullNameByShortName.TryGetValue(t.TypeName, out var fullName)
+                        ? fullName
+                        : t.TypeName;
+
+                return (CanonicalName: canonicalName, t.Score);
+            })
+            .GroupBy(x => x.CanonicalName, StringComparer.OrdinalIgnoreCase)
+            .Select(g => (TypeName: g.Key, Score: g.Max(x => x.Score)))
+            .OrderByDescending(x => x.Score)
+            .ThenBy(x => x.TypeName.Length)
+            .ToList();
     }
 }
