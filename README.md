@@ -220,8 +220,7 @@ fileFilter: .cs
 - [B站视频教程（点击跳转）](https://www.bilibili.com/video/BV1w1cJz7E9t?vd_source=624604839a08e42cea3a8cb45151b201)
 
 ### 前置要求
-- 运行发布包：.NET 10 Runtime（`--self-contained false` 发布时需要）
-- 源码构建：.NET 10 SDK
+> 安装 [.NET 10 SDK](https://dotnet.microsoft.com/download/dotnet/10.0)
 
 ### 安装步骤
 1. 从 [Releases](https://github.com/kearril/RimSearcher/releases) 下载 `RimSearcher.Server.exe`。
@@ -242,7 +241,7 @@ fileFilter: .cs
 ```
 
 字段说明：
-- `CsharpSourcePaths`: C# 源码目录（反编译源码目录）
+- `CsharpSourcePaths`: C# 源码目录（反编译源码目录，需要自己反编译导出游戏源码文件，这里不提供）
 - `XmlSourcePaths`: RimWorld `Data` 目录
 - `SkipPathSecurity`: `true` 时关闭路径白名单检查（仅建议本地可信环境）
 - `CheckUpdates`: 是否启用版本更新提示
@@ -317,7 +316,7 @@ fileFilter: .cs
 
 然后运行 `RimSearcher.Server.exe`，若看到类似 `Program: Index build completed ...` 与 `Program: RimSearcher MCP server started` 日志，表示启动成功。
 
-![启动成功示例](Image/Snipaste_2026-02-09_20-34-49.png)
+![启动成功示例](Image/Snipaste_2026-02-20_21-53-48.png)
 
 快速检查是否接入成功：
 - 客户端工具列表中能看到 `rimworld-searcher__locate`、`rimworld-searcher__inspect` 等 6 个工具。
