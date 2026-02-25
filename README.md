@@ -29,6 +29,11 @@
 - 启动后冻结索引（`FrozenDictionary`）优化只读查询吞吐
 - 搜索结果带上限控制，避免超长输出拖慢上下文
 
+### 低 Token 消耗（LLM 友好）
+- 采用先定位再深入的查询链路（`locate` → `inspect`/`trace` → `read_code`），避免一次返回大段无关文本
+- `locate` / `trace` / `search_regex` 工具采用结果上限与预览截断，控制上下文体积并保持关键信息密度
+- `read_code` 支持按 `methodName`/`extractClass` 精确读取代码，未指定成员时再按小范围行号读取，避免一次返回整个文件
+
 ### 运行模型与边界
 - 本地运行，核心检索不依赖网络
 - 网络请求仅用于版本更新提示（可关闭）
@@ -220,7 +225,9 @@ fileFilter: .cs
 - [B站视频教程（点击跳转）](https://www.bilibili.com/video/BV1w1cJz7E9t?vd_source=624604839a08e42cea3a8cb45151b201)
 
 ### 前置要求
-> 安装 [.NET 10 SDK](https://dotnet.microsoft.com/download/dotnet/10.0)
+> 运行 Release 版 `RimSearcher.Server.exe` 需要 [.NET 10 Runtime](https://dotnet.microsoft.com/download/dotnet/10.0)；
+> 
+> 若需本地编译源码，则需要安装 .NET 10 SDK。
 
 ### 安装步骤
 1. 从 [Releases](https://github.com/kearril/RimSearcher/releases) 下载 `RimSearcher.Server.exe`。
@@ -329,6 +336,7 @@ fileFilter: .cs
 - 更新检查为非阻塞后台任务，不影响核心检索服务。
 - 仅在 `CheckUpdates=true` 时启用。
 - 若遇到 GitHub 匿名限流，更新检查会静默失败，不影响工具功能。
+- 更新信息默认通过日志通道输出；若 MCP 客户端不展示日志，则可能看不到该提示。
 
 ---
 
