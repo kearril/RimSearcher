@@ -37,9 +37,6 @@ public partial class DefIndexer
         _logger = logger;
     }
     
-    /// <summary>
-    /// Freezes all indices for read-optimized access. Call after all Scan() calls complete.
-    /// </summary>
     public void FreezeIndex()
     {
         _frozenDefNameIndex = _defNameIndex.ToFrozenDictionary(StringComparer.OrdinalIgnoreCase);
@@ -48,6 +45,96 @@ public partial class DefIndexer
             kv => kv.Key, kv => kv.Value.Distinct().ToArray(), StringComparer.OrdinalIgnoreCase);
         _frozenFieldContentIndex = _fieldContentIndex.ToFrozenDictionary(
             kv => kv.Key, kv => kv.Value.Distinct().ToArray(), StringComparer.OrdinalIgnoreCase);
+    }
+
+    public DefIndexerSnapshot ExportSnapshot()
+    {
+        var labelIndex = _frozenLabelIndex != null
+            ? _frozenLabelIndex.ToDictionary(kv => kv.Key, kv => kv.Value, StringComparer.OrdinalIgnoreCase)
+            : _labelIndex.ToDictionary(kv => kv.Key, kv => kv.Value.Distinct().ToArray(), StringComparer.OrdinalIgnoreCase);
+
+        Dictionary<string, DefFieldContentSnapshot[]> fieldContentIndex;
+        if (_frozenFieldContentIndex != null)
+        {
+            fieldContentIndex = _frozenFieldContentIndex.ToDictionary(
+                kv => kv.Key,
+                kv => kv.Value.Select(entry => new DefFieldContentSnapshot
+                {
+                    Location = entry.Location,
+                    FieldPath = entry.FieldPath
+                }).ToArray(),
+                StringComparer.OrdinalIgnoreCase);
+        }
+        else
+        {
+            fieldContentIndex = _fieldContentIndex.ToDictionary(
+                kv => kv.Key,
+                kv => kv.Value.Distinct().Select(entry => new DefFieldContentSnapshot
+                {
+                    Location = entry.Location,
+                    FieldPath = entry.FieldPath
+                }).ToArray(),
+                StringComparer.OrdinalIgnoreCase);
+        }
+
+        var defNameIndex = _frozenDefNameIndex != null
+            ? _frozenDefNameIndex.ToDictionary(kv => kv.Key, kv => kv.Value, StringComparer.OrdinalIgnoreCase)
+            : new Dictionary<string, DefLocation>(_defNameIndex, StringComparer.OrdinalIgnoreCase);
+
+        var parentNameIndex = _frozenParentNameIndex != null
+            ? _frozenParentNameIndex.ToDictionary(kv => kv.Key, kv => kv.Value, StringComparer.OrdinalIgnoreCase)
+            : new Dictionary<string, DefLocation>(_parentNameIndex, StringComparer.OrdinalIgnoreCase);
+
+        return new DefIndexerSnapshot
+        {
+            DefNameIndex = defNameIndex,
+            ParentNameIndex = parentNameIndex,
+            LabelIndex = labelIndex,
+            FieldContentIndex = fieldContentIndex,
+            ProcessedFiles = _processedFiles.Keys.Distinct(StringComparer.OrdinalIgnoreCase).ToArray()
+        };
+    }
+
+    public void ImportSnapshot(DefIndexerSnapshot snapshot)
+    {
+        if (snapshot == null) throw new ArgumentNullException(nameof(snapshot));
+
+        _defNameIndex.Clear();
+        _parentNameIndex.Clear();
+        _labelIndex.Clear();
+        _fieldContentIndex.Clear();
+        _processedFiles.Clear();
+        ResetFrozenState();
+
+        foreach (var (key, value) in snapshot.DefNameIndex)
+        {
+            _defNameIndex[key] = value;
+        }
+
+        foreach (var (key, value) in snapshot.ParentNameIndex)
+        {
+            _parentNameIndex[key] = value;
+        }
+
+        foreach (var (key, values) in snapshot.LabelIndex)
+        {
+            var deduped = values.Distinct().ToArray();
+            _labelIndex[key] = new ConcurrentBag<DefLocation>(deduped);
+        }
+
+        foreach (var (key, values) in snapshot.FieldContentIndex)
+        {
+            var deduped = values
+                .Select(entry => (entry.Location, entry.FieldPath))
+                .Distinct()
+                .ToArray();
+            _fieldContentIndex[key] = new ConcurrentBag<(DefLocation Location, string FieldPath)>(deduped);
+        }
+
+        foreach (var file in snapshot.ProcessedFiles.Where(file => !string.IsNullOrWhiteSpace(file)).Distinct(StringComparer.OrdinalIgnoreCase))
+        {
+            _processedFiles[file] = 0;
+        }
     }
 
     public void Scan(string rootPath)
@@ -264,5 +351,13 @@ public partial class DefIndexer
     {
         if (_frozenParentNameIndex != null && _frozenParentNameIndex.TryGetValue(parentName, out var loc)) return loc;
         return _parentNameIndex.TryGetValue(parentName, out var loc2) ? loc2 : null;
+    }
+
+    private void ResetFrozenState()
+    {
+        _frozenDefNameIndex = null;
+        _frozenParentNameIndex = null;
+        _frozenLabelIndex = null;
+        _frozenFieldContentIndex = null;
     }
 }

@@ -27,10 +27,6 @@ public class SourceIndexer
     private FrozenDictionary<string, (string TypeName, string MemberName, string MemberType, string FilePath)[]>? _frozenMemberIndex;
     public bool IsFrozen { get; private set; }
     
-    /// <summary>
-    /// Converts all mutable concurrent indices to frozen read-optimized collections.
-    /// Call after all Scan() calls are complete. Deduplicates entries and reduces memory.
-    /// </summary>
     public void FreezeIndex()
     {
         _frozenIndex = _index.ToFrozenDictionary(
@@ -52,6 +48,134 @@ public class SourceIndexer
             .Distinct(StringComparer.OrdinalIgnoreCase).ToList();
         
         IsFrozen = true;
+    }
+
+    public SourceIndexerSnapshot ExportSnapshot()
+    {
+        var fileIndex = _frozenIndex != null
+            ? _frozenIndex.ToDictionary(kv => kv.Key, kv => kv.Value, StringComparer.OrdinalIgnoreCase)
+            : _index.ToDictionary(kv => kv.Key, kv => kv.Value.Distinct().ToArray(), StringComparer.OrdinalIgnoreCase);
+
+        var typeMap = _frozenTypeMap != null
+            ? _frozenTypeMap.ToDictionary(kv => kv.Key, kv => kv.Value, StringComparer.OrdinalIgnoreCase)
+            : _typeMap.ToDictionary(kv => kv.Key, kv => kv.Value.Distinct().ToArray(), StringComparer.OrdinalIgnoreCase);
+
+        var inheritorsMap = _frozenInheritorsMap != null
+            ? _frozenInheritorsMap.ToDictionary(kv => kv.Key, kv => kv.Value, StringComparer.OrdinalIgnoreCase)
+            : _inheritorsMap.ToDictionary(kv => kv.Key, kv => kv.Value.Distinct().ToArray(), StringComparer.OrdinalIgnoreCase);
+
+        var shortTypeMap = _frozenShortTypeMap != null
+            ? _frozenShortTypeMap.ToDictionary(kv => kv.Key, kv => kv.Value, StringComparer.OrdinalIgnoreCase)
+            : _shortTypeMap.ToDictionary(kv => kv.Key, kv => kv.Value.Distinct().ToArray(), StringComparer.OrdinalIgnoreCase);
+
+        var ngramIndex = _frozenNgramIndex != null
+            ? _frozenNgramIndex.ToDictionary(kv => kv.Key, kv => kv.Value, StringComparer.OrdinalIgnoreCase)
+            : _ngramIndex.ToDictionary(kv => kv.Key, kv => kv.Value.Distinct().ToArray(), StringComparer.OrdinalIgnoreCase);
+
+        Dictionary<string, SourceMemberSnapshot[]> memberIndex;
+        if (_frozenMemberIndex != null)
+        {
+            memberIndex = _frozenMemberIndex.ToDictionary(
+                kv => kv.Key,
+                kv => kv.Value.Select(member => new SourceMemberSnapshot
+                {
+                    TypeName = member.TypeName,
+                    MemberName = member.MemberName,
+                    MemberType = member.MemberType,
+                    FilePath = member.FilePath
+                }).ToArray(),
+                StringComparer.OrdinalIgnoreCase);
+        }
+        else
+        {
+            memberIndex = _memberIndex.ToDictionary(
+                kv => kv.Key,
+                kv => kv.Value.Distinct().Select(member => new SourceMemberSnapshot
+                {
+                    TypeName = member.TypeName,
+                    MemberName = member.MemberName,
+                    MemberType = member.MemberType,
+                    FilePath = member.FilePath
+                }).ToArray(),
+                StringComparer.OrdinalIgnoreCase);
+        }
+
+        var processedFiles = _processedFiles.Keys.Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
+
+        return new SourceIndexerSnapshot
+        {
+            FileIndex = fileIndex,
+            TypeMap = typeMap,
+            InheritanceMap = new Dictionary<string, string>(_inheritanceMap, StringComparer.OrdinalIgnoreCase),
+            InheritorsMap = inheritorsMap,
+            ShortTypeMap = shortTypeMap,
+            MemberIndex = memberIndex,
+            NgramIndex = ngramIndex,
+            ProcessedFiles = processedFiles
+        };
+    }
+
+    public void ImportSnapshot(SourceIndexerSnapshot snapshot)
+    {
+        if (snapshot == null) throw new ArgumentNullException(nameof(snapshot));
+
+        _index.Clear();
+        _typeMap.Clear();
+        _inheritanceMap.Clear();
+        _inheritorsMap.Clear();
+        _shortTypeMap.Clear();
+        _memberIndex.Clear();
+        _ngramIndex.Clear();
+        _processedFiles.Clear();
+        ResetFrozenState();
+
+        foreach (var (key, values) in snapshot.FileIndex)
+        {
+            _index[key] = ToStringBag(values);
+        }
+
+        foreach (var (key, values) in snapshot.TypeMap)
+        {
+            _typeMap[key] = ToStringBag(values);
+        }
+
+        foreach (var (key, value) in snapshot.InheritanceMap)
+        {
+            _inheritanceMap[key] = value;
+        }
+
+        foreach (var (key, values) in snapshot.InheritorsMap)
+        {
+            _inheritorsMap[key] = ToStringBag(values);
+        }
+
+        foreach (var (key, values) in snapshot.ShortTypeMap)
+        {
+            _shortTypeMap[key] = ToStringBag(values);
+        }
+
+        foreach (var (key, values) in snapshot.MemberIndex)
+        {
+            var entries = values
+                .Select(member => (member.TypeName, member.MemberName, member.MemberType, member.FilePath))
+                .Distinct()
+                .ToArray();
+            _memberIndex[key] = new ConcurrentBag<(string TypeName, string MemberName, string MemberType, string FilePath)>(entries);
+        }
+
+        foreach (var (key, values) in snapshot.NgramIndex)
+        {
+            _ngramIndex[key] = ToStringBag(values);
+        }
+
+        foreach (var file in snapshot.ProcessedFiles.Where(file => !string.IsNullOrWhiteSpace(file)).Distinct(StringComparer.OrdinalIgnoreCase))
+        {
+            _processedFiles[file] = 0;
+        }
+
+        _cachedAllTypeNames = _typeMap.Keys.Concat(_shortTypeMap.Keys)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
     }
 
     public void Scan(string rootPath)
@@ -496,5 +620,22 @@ public class SourceIndexer
     {
         if (_frozenIndex != null) return _frozenIndex.Values.SelectMany(x => x);
         return _index.Values.SelectMany(x => x).Distinct();
+    }
+
+    private void ResetFrozenState()
+    {
+        _frozenIndex = null;
+        _frozenTypeMap = null;
+        _frozenInheritorsMap = null;
+        _frozenShortTypeMap = null;
+        _frozenNgramIndex = null;
+        _frozenMemberIndex = null;
+        IsFrozen = false;
+    }
+
+    private static ConcurrentBag<string> ToStringBag(IEnumerable<string> values)
+    {
+        var list = values.Where(value => !string.IsNullOrWhiteSpace(value)).Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
+        return new ConcurrentBag<string>(list);
     }
 }
