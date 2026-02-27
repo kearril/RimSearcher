@@ -1,20 +1,23 @@
 using System.Net.Http;
 using System.Text.Json;
+using RimSearcher.Core;
 
 namespace RimSearcher.Server;
 
 public static class UpdateChecker
 {
-    public const string CurrentVersion = "2.5";
+    public const string CurrentVersion = "2.6";//版本号
     private const string GitHubApiUrl = "https://api.github.com/repos/kearril/RimSearcher/releases/latest";
-    private static readonly string CacheFilePath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, ".update-cache");
-
-    /// <summary>
-    /// Checks for updates in the background. Non-blocking, fire-and-forget.
-    /// Sends a warning log via ServerLogger if a newer version is available.
-    /// Silently ignores all errors (network, parse, timeout).
-    /// Caches results for 24 hours to avoid excessive API calls.
-    /// </summary>
+    private static string CacheFilePath
+    {
+        get
+        {
+            var indexCacheDir = IndexCacheService.GetDefaultCacheDirectory();
+            var parent = Path.GetDirectoryName(indexCacheDir) ?? indexCacheDir;
+            return Path.Combine(parent, ".update-cache");
+        }
+    }
+    
     public static async Task CheckAsync()
     {
         try
@@ -60,9 +63,10 @@ public static class UpdateChecker
 
     private static async Task NotifyUpdate(string latestVersion)
     {
-        await ServerLogger.Warning(
-            $"UpdateChecker: RimSearcher v{latestVersion} is available (current: v{CurrentVersion}). " +
-            $"Download: https://github.com/kearril/RimSearcher/releases/latest");
+        await ServerLogger.Warning("UpdateChecker", "New version is available",
+            ("current", CurrentVersion),
+            ("latest", latestVersion),
+            ("url", "https://github.com/kearril/RimSearcher/releases/latest"));
     }
 
     private static bool IsNewer(string remote, string local)
@@ -113,6 +117,8 @@ public static class UpdateChecker
     {
         try
         {
+            var dir = Path.GetDirectoryName(CacheFilePath);
+            if (!string.IsNullOrWhiteSpace(dir)) Directory.CreateDirectory(dir);
             File.WriteAllLines(CacheFilePath, new[]
             {
                 version,

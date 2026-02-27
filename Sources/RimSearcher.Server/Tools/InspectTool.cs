@@ -141,9 +141,8 @@ public class InspectTool : ITool
                 }
             }
             catch (OperationCanceledException) { throw; }
-            catch (Exception ex)
+            catch (Exception)
             {
-                await ServerLogger.Debug($"InspectTool: Linked type extraction failed for {name}: {ex.Message}");
             }
 
             return new ToolResult(sb.ToString());
