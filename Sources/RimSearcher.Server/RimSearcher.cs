@@ -61,7 +61,6 @@ public sealed class RimSearcher
                             if (_activeRequests.TryRemove(idToCancel, out var targetCts))
                             {
                                 targetCts.Cancel();
-                                await ServerLogger.Debug($"RimSearcher: Client cancelled request {idToCancel}");
                             }
                         }
                         return;
@@ -127,7 +126,7 @@ public sealed class RimSearcher
             }
             else if (method == "notifications/initialized")
             {
-                await LogAsync("RimSearcher server initialized and ready to handle requests.", "info");
+                await LogAsync("RimSearcher: Server initialized and ready to handle requests.", "info");
             }
             else if (method == "list_tools" || method == "tools/list")
             {
@@ -186,12 +185,40 @@ public sealed class RimSearcher
     
     public async Task LogAsync(string message, string level = "info", string? logger = "RimSearcher")
     {
+        if (string.Equals(logger, "RimSearcher", StringComparison.Ordinal) && TrySplitComponentMessage(message, out var component, out var normalizedMessage))
+        {
+            logger = component;
+            message = normalizedMessage;
+        }
+
         await SendNotificationAsync("notifications/logging/message", new
         {
             level = level,
             logger = logger,
             data = message
         });
+    }
+
+    private static bool TrySplitComponentMessage(string message, out string component, out string normalizedMessage)
+    {
+        component = string.Empty;
+        normalizedMessage = message;
+
+        if (string.IsNullOrWhiteSpace(message)) return false;
+
+        var separatorIndex = message.IndexOf(": ", StringComparison.Ordinal);
+        if (separatorIndex <= 0 || separatorIndex > 40) return false;
+
+        var prefix = message[..separatorIndex];
+        if (prefix.Any(ch => !char.IsLetterOrDigit(ch) && ch != '.' && ch != '_' && ch != '-'))
+            return false;
+
+        var suffix = message[(separatorIndex + 2)..].Trim();
+        if (string.IsNullOrWhiteSpace(suffix)) return false;
+
+        component = prefix;
+        normalizedMessage = suffix;
+        return true;
     }
 
     private async Task SendNotificationAsync(string method, object? @params = null)
