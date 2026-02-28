@@ -9,10 +9,9 @@ namespace RimSearcher.Core;
 
 public record DefLocation(string FilePath, string DefType, string DefName, string? ParentName, string? Label, bool IsAbstract = false);
 
-public partial class DefIndexer
+public class DefIndexer
 {
-    [GeneratedRegex(@"\W+")]
-    private static partial Regex WordSplitRegex();
+    private static readonly Regex WordSplitRegex = new(@"\W+", RegexOptions.Compiled);
     
     private readonly ILogger? _logger;
     private readonly ConcurrentDictionary<string, DefLocation> _defNameIndex = new(StringComparer.OrdinalIgnoreCase);
@@ -25,7 +24,7 @@ public partial class DefIndexer
         new(StringComparer.OrdinalIgnoreCase);
 
     private readonly ConcurrentDictionary<string, byte> _processedFiles = new(StringComparer.OrdinalIgnoreCase);
-    private static readonly XmlReaderSettings SafeSettings = new() { DtdProcessing = DtdProcessing.Prohibit };
+    private static readonly XmlReaderSettings XmlReadSettings = new() { DtdProcessing = DtdProcessing.Parse };
     
     private FrozenDictionary<string, DefLocation>? _frozenDefNameIndex;
     private FrozenDictionary<string, DefLocation>? _frozenParentNameIndex;
@@ -213,7 +212,7 @@ public partial class DefIndexer
     public XDocument GetOrLoadDocument(string filePath)
     {
         using var stream = new FileStream(filePath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
-        using var reader = XmlReader.Create(stream, SafeSettings);
+        using var reader = XmlReader.Create(stream, XmlReadSettings);
         return XDocument.Load(reader);
     }
 
@@ -235,7 +234,7 @@ public partial class DefIndexer
         if (!element.HasElements && !string.IsNullOrWhiteSpace(element.Value))
         {
             var value = element.Value.Trim();
-            var words = WordSplitRegex().Split(value)
+            var words = WordSplitRegex.Split(value)
                 .Where(w => w.Length >= 3)
                 .Select(w => w.ToLowerInvariant())
                 .Distinct();

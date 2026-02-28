@@ -25,7 +25,6 @@ public class SourceIndexer
     private FrozenDictionary<string, string[]>? _frozenShortTypeMap;
     private FrozenDictionary<string, string[]>? _frozenNgramIndex;
     private FrozenDictionary<string, (string TypeName, string MemberName, string MemberType, string FilePath)[]>? _frozenMemberIndex;
-    public bool IsFrozen { get; private set; }
     
     public void FreezeIndex()
     {
@@ -46,8 +45,6 @@ public class SourceIndexer
         
         _cachedAllTypeNames = _frozenTypeMap.Keys.Concat(_frozenShortTypeMap.Keys)
             .Distinct(StringComparer.OrdinalIgnoreCase).ToList();
-        
-        IsFrozen = true;
     }
 
     public SourceIndexerSnapshot ExportSnapshot()
@@ -630,7 +627,6 @@ public class SourceIndexer
         _frozenShortTypeMap = null;
         _frozenNgramIndex = null;
         _frozenMemberIndex = null;
-        IsFrozen = false;
     }
 
     private static ConcurrentBag<string> ToStringBag(IEnumerable<string> values)

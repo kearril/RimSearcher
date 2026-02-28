@@ -1,12 +1,9 @@
-using System.Xml;
 using System.Xml.Linq;
 
 namespace RimSearcher.Core;
 
 public static class XmlInheritanceHelper
 {
-    private static readonly XmlReaderSettings SafeSettings = new() { DtdProcessing = DtdProcessing.Prohibit };
-
     private static readonly HashSet<string> ListContainerNames = new(StringComparer.OrdinalIgnoreCase)
     {
         "comps", "stages", "modExtensions", "lifeStages", "hediffGivers",
@@ -39,7 +36,6 @@ public static class XmlInheritanceHelper
         {
             if (!visited.Add(currentLoc.DefName + currentLoc.FilePath)) break;
             if (visited.Count > 15) break;
-            if (!PathSecurity.IsPathSafe(currentLoc.FilePath)) break;
 
             try
             {
@@ -91,15 +87,6 @@ public static class XmlInheritanceHelper
 
         CleanupMetadata(result);
         return result;
-    }
-
-    /// <summary>
-    /// Convenience method that returns the resolved XML as a string.
-    /// </summary>
-    public static async Task<string> ResolveDefXmlAsync(string defName, DefIndexer indexer)
-    {
-        var element = await ResolveDefXmlElementAsync(defName, indexer);
-        return element?.ToString() ?? "Def not found";
     }
 
     private static void CleanupMetadata(XElement element)

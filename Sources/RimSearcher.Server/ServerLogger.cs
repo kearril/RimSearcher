@@ -16,11 +16,6 @@ public static class ServerLogger
         }
     }
 
-    public static async Task Info(string message) => await LogAsync(message, "info");
-    public static async Task Error(string message) => await LogAsync(message, "error");
-    public static async Task Warning(string message) => await LogAsync(message, "warning");
-    public static async Task Debug(string message) => await LogAsync(message, "debug");
-
     public static async Task Info(string component, string message, params (string Key, object? Value)[] fields)
         => await LogAsync(Format(component, message, fields), "info");
 

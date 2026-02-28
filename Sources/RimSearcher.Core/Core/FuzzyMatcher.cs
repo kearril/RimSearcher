@@ -2,10 +2,9 @@ using System.Text.RegularExpressions;
 
 namespace RimSearcher.Core;
 
-public static partial class FuzzyMatcher
+public static class FuzzyMatcher
 {
-    [System.Text.RegularExpressions.GeneratedRegex(@"[_\.\-\s]+")]
-    private static partial Regex WordSplitRegex();
+    private static readonly Regex WordSplitRegex = new(@"[_\.\-\s]+", RegexOptions.Compiled);
 
     public static double CalculateFuzzyScore(string text, string query)
     {
@@ -57,7 +56,7 @@ public static partial class FuzzyMatcher
         return 0.0;
     }
 
-    public static int LevenshteinDistance(string source, string target)
+    private static int LevenshteinDistance(string source, string target)
     {
         if (string.IsNullOrEmpty(source)) return target?.Length ?? 0;
         if (string.IsNullOrEmpty(target)) return source.Length;
@@ -84,20 +83,20 @@ public static partial class FuzzyMatcher
         return previousRow[targetLength];
     }
 
-    public static bool IsWordBoundaryMatch(string text, string query)
+    private static bool IsWordBoundaryMatch(string text, string query)
     {
         if (string.IsNullOrEmpty(text) || string.IsNullOrEmpty(query)) return false;
         return SplitIntoWords(text).Any(word => word.StartsWith(query, StringComparison.OrdinalIgnoreCase));
     }
 
-    public static bool IsCamelCaseMatch(string text, string query)
+    private static bool IsCamelCaseMatch(string text, string query)
     {
         if (string.IsNullOrEmpty(text) || string.IsNullOrEmpty(query)) return false;
         var initials = ExtractCamelCaseInitials(text);
         return initials.Equals(query, StringComparison.OrdinalIgnoreCase) || initials.StartsWith(query, StringComparison.OrdinalIgnoreCase);
     }
 
-    public static string ExtractCamelCaseInitials(string text)
+    private static string ExtractCamelCaseInitials(string text)
     {
         if (string.IsNullOrEmpty(text)) return string.Empty;
         return new string(SplitIntoWords(text).Where(w => w.Length > 0).Select(w => char.ToUpperInvariant(w[0])).ToArray());
@@ -106,7 +105,7 @@ public static partial class FuzzyMatcher
     public static List<string> SplitIntoWords(string text)
     {
         if (string.IsNullOrEmpty(text)) return new List<string>();
-        var parts = WordSplitRegex().Split(text);
+        var parts = WordSplitRegex.Split(text);
         var result = new List<string>();
 
         foreach (var part in parts)
@@ -116,7 +115,7 @@ public static partial class FuzzyMatcher
         return result;
     }
 
-    public static List<string> SplitCamelCase(string text)
+    private static List<string> SplitCamelCase(string text)
     {
         if (string.IsNullOrEmpty(text)) return new List<string>();
         var result = new List<string>();

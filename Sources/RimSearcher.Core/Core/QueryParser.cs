@@ -8,7 +8,6 @@ public class ParsedQuery
     public string? MethodFilter { get; set; }
     public string? FieldFilter { get; set; }
     public string? DefFilter { get; set; }
-    public bool FuzzyMode { get; set; } = true;
 }
 
 public static class QueryParser
