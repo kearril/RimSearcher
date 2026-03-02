@@ -314,6 +314,45 @@ RimSearcher 会自动探测 Mod 的标准目录结构：
 - 同时索引所有存在的版本目录
 - 自动探测版本目录下的 `Source/`、`Defs/`、`Patches/` 子目录
 
+#### Mod 支持的设计思考与局限性
+
+本项目定位为"以最少的 token 消耗对本地静态源码进行精确检索与分析"。以下是针对 Mod 支持中几个核心难题的解决方案：
+
+**XML Patch 处理**
+
+问题：游戏本体的 XML Patch 非常少，而 Mod 会大量运用。项目的 XML 解析策略是直接返回继承合并后的最终 Def，但这导致对 XML Patch 的解析困难。
+
+解决方案：采用"知情但不模拟"策略——索引 Patch 的目标 Def 和操作类型，让 LLM 感知 Patch 存在，但不尝试模拟合并结果。
+
+**Harmony Patch 处理**
+
+问题：Harmony 补丁是运行时注入的，如果每次 `read_code` 后都自动查询是否被 Patch，会增加 LLM 的混乱。
+
+解决方案：在 `inspect` 工具返回时附加 Patch 数量提示，LLM 可通过 `list_patches` 工具按需查询，而非每次都触发。
+
+**Transpiler 解析**
+
+问题：Transpiler 直接操作 IL 代码，静态分析无法看到 IL Code。
+
+当前局限：
+- ✅ 可以索引 Transpiler 的存在和目标方法
+- ❌ 无法分析 Transpiler 的实际效果
+
+**Mod 文件结构**
+
+问题：Mod 可能同时存在多个版本文件夹，Patch 文件位置因作者而异。
+
+解决方案：自动探测所有版本目录，同时索引根目录和版本目录下的内容。
+
+**功能边界**
+
+| 能做 | 不能做 |
+|------|--------|
+| 索引 Patch 文件位置和目标 | 模拟 Patch 合并结果 |
+| 索引 Harmony Patch 声明 | 分析 Transpiler 实际效果 |
+| 提供 Patch 查询能力 | 反编译 DLL 文件 |
+| 让 LLM 感知 Patch 存在 | 预测运行时行为 |
+
 3. 在 MCP 客户端中把 `RimSearcher.Server.exe` 注册为 **stdio MCP Server**，并设置环境变量 `RIMSEARCHER_CONFIG` 指向上一步的 `config.json`。
 
 > 兼容模式说明：
