@@ -133,13 +133,7 @@ public sealed class RimSearcher
                 if (id == null) return;
                 await SendResponseAsync(id, new
                 {
-                    tools = _tools.Values.Select(t => new
-                    {
-                        name = t.Name,
-                        description = t.Description,
-                        inputSchema = t.JsonSchema,
-                        annotations = t.Icon != null ? new { icon = t.Icon } : null
-                    })
+                    tools = _tools.Values.Select(t => BuildToolResponse(t))
                 });
             }
             else if (method == "call_tool" || method == "tools/call")
@@ -219,6 +213,26 @@ public sealed class RimSearcher
         component = prefix;
         normalizedMessage = suffix;
         return true;
+    }
+
+    private static object BuildToolResponse(ITool tool)
+    {
+        if (tool.Icon != null)
+        {
+            return new
+            {
+                name = tool.Name,
+                description = tool.Description,
+                inputSchema = tool.JsonSchema,
+                annotations = new { icon = tool.Icon }
+            };
+        }
+        return new
+        {
+            name = tool.Name,
+            description = tool.Description,
+            inputSchema = tool.JsonSchema
+        };
     }
 
     private async Task SendNotificationAsync(string method, object? @params = null)

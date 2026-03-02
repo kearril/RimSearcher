@@ -4,6 +4,17 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Fixed
+
+#### MCP 协议兼容性修复
+- 修复 `tools/list` 响应中 `annotations` 字段为 `null` 导致 MCP 客户端验证失败的问题
+- 当工具没有图标时，不再包含 `annotations` 字段（而非设置为 `null`）
+- 符合 MCP 协议规范：`annotations` 必须是 `object` 类型或不存在
+
+#### RimWorld 1.6 版本支持
+- `ModPathResolver.VersionDirNames` 新增 `1.6` 版本目录支持
+- 修复使用 `1.6/` 版本目录的 Mod 无法被正确索引的问题
+
 ### Added - Mod 数据索引支持
 
 #### Mod 配置

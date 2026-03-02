@@ -1,10 +1,5 @@
 # Pull Request: 添加 Mod 数据索引和 Patch 查询支持
 
-## 标题
-```
-feat: 添加 Mod 数据索引和 Patch 查询支持
-```
-
 ## 描述
 本 PR 为 RimSearcher 添加了 Mod 数据索引和 Patch 查询支持，让开发者能够索引 Mod 的源码和 Defs，从而更高效地进行 Mod 开发。
 

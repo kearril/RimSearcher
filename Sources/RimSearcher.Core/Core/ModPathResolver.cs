@@ -14,7 +14,7 @@ public record ResolvedModPaths
 
 public static class ModPathResolver
 {
-    private static readonly string[] VersionDirNames = { "1.5", "1.4", "1.3", "1.2", "1.1" };
+    private static readonly string[] VersionDirNames = { "1.6", "1.5", "1.4", "1.3", "1.2", "1.1" };
     private static readonly string[] DefaultCsharpDirNames = { "Source", "Sources" };
     private static readonly string[] DefaultXmlDirNames = { "Defs", "Def" };
     private static readonly string[] DefaultPatchDirNames = { "Patches", "Patch" };
