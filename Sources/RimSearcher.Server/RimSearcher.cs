@@ -137,8 +137,7 @@ public sealed class RimSearcher
                     {
                         name = t.Name,
                         description = t.Description,
-                        inputSchema = t.JsonSchema,
-                        annotations = t.Icon != null ? new { icon = t.Icon } : null
+                        inputSchema = t.JsonSchema
                     })
                 });
             }

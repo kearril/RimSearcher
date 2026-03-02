@@ -3,7 +3,6 @@ using System.Collections.Frozen;
 using System.Text.RegularExpressions;
 using System.Xml;
 using System.Xml.Linq;
-using Microsoft.Extensions.Logging;
 
 namespace RimSearcher.Core;
 
@@ -12,8 +11,7 @@ public record DefLocation(string FilePath, string DefType, string DefName, strin
 public class DefIndexer
 {
     private static readonly Regex WordSplitRegex = new(@"\W+", RegexOptions.Compiled);
-    
-    private readonly ILogger? _logger;
+
     private readonly ConcurrentDictionary<string, DefLocation> _defNameIndex = new(StringComparer.OrdinalIgnoreCase);
     private readonly ConcurrentDictionary<string, DefLocation> _parentNameIndex = new(StringComparer.OrdinalIgnoreCase);
 
@@ -31,11 +29,6 @@ public class DefIndexer
     private FrozenDictionary<string, DefLocation[]>? _frozenLabelIndex;
     private FrozenDictionary<string, (DefLocation Location, string FieldPath)[]>? _frozenFieldContentIndex;
 
-    public DefIndexer(ILogger? logger = null)
-    {
-        _logger = logger;
-    }
-    
     public void FreezeIndex()
     {
         _frozenDefNameIndex = _defNameIndex.ToFrozenDictionary(StringComparer.OrdinalIgnoreCase);
@@ -203,10 +196,6 @@ public class DefIndexer
             catch { }
         });
 
-        if (_logger != null && totalParsed > 0)
-        {
-            _logger.LogInformation("DefIndexer: XML scan parsed {Count} defs", totalParsed);
-        }
     }
 
     public XDocument GetOrLoadDocument(string filePath)

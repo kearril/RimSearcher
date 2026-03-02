@@ -35,7 +35,7 @@ else if (!hasPaths)
 PathSecurity.Initialize(appConfig.CsharpSourcePaths.Concat(appConfig.XmlSourcePaths), enabled: !appConfig.SkipPathSecurity);
 
 var indexer = new SourceIndexer();
-var defIndexer = new DefIndexer(Microsoft.Extensions.Logging.Abstractions.NullLogger.Instance);
+var defIndexer = new DefIndexer();
 
 var failedPaths = new List<string>();
 var existingCsharpPaths = new List<string>();
@@ -158,7 +158,7 @@ if (isLoaded && hasPaths)
 
 if (appConfig.CheckUpdates)
 {
-    _ = Task.Run(async () => await UpdateChecker.CheckAsync());
+    _ = Task.Run(UpdateChecker.CheckAsync);
 }
 
 await server.RunAsync();

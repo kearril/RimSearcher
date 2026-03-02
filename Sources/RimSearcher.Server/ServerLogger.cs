@@ -25,9 +25,6 @@ public static class ServerLogger
     public static async Task Error(string component, string message, params (string Key, object? Value)[] fields)
         => await LogAsync(Format(component, message, fields), "error");
 
-    public static async Task Debug(string component, string message, params (string Key, object? Value)[] fields)
-        => await LogAsync(Format(component, message, fields), "debug");
-
     private static string Format(string component, string message, (string Key, object? Value)[] fields)
     {
         var normalizedMessage = Sanitize(message);
