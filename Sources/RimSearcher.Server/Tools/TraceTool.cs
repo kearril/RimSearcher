@@ -16,9 +16,7 @@ public class TraceTool : ITool
     public string Name => "rimworld-searcher__trace";
 
     public string Description =>
-        "Cross-reference analysis for C# and XML. Mode 'inheritors' lists subclasses; mode 'usages' finds references with file/line previews. Tested: usages 'CompShield' found 9 refs across 6 files, inheritors 'ThingComp' returns a broad subclass list.";
-
-    public string? Icon => "lucide:git-branch";
+        "Cross-reference analysis for C# and XML. Mode: 'inheritors' (subclasses) or 'usages' (file/line references).";
 
     public object JsonSchema => new
     {
@@ -28,6 +26,7 @@ public class TraceTool : ITool
             symbol = new
             {
                 type = "string",
+                minLength = 1,
                 description = "Class or member to trace. Examples: 'ThingComp', 'CompShield', 'TakeDamage'."
             },
             mode = new
@@ -38,7 +37,8 @@ public class TraceTool : ITool
                     "Trace mode: 'inheritors' for subclass tree, 'usages' for textual references in C# and XML."
             }
         },
-        required = new[] { "symbol", "mode" }
+        required = new[] { "symbol", "mode" },
+        additionalProperties = false
     };
 
     public async Task<ToolResult> ExecuteAsync(JsonElement args, CancellationToken cancellationToken, IProgress<double>? progress = null)

@@ -16,44 +16,51 @@ public class ReadCodeTool : ITool
     public string Name => "rimworld-searcher__read_code";
 
     public string Description =>
-        "Read C# source by member, class, or line range. Supports methods/properties/constructors/indexers/operators via 'methodName', full type body via 'extractClass', and raw line reads. Tested: path 'CompShield.cs' + method 'CompTick' extracts the method body with line info.";
-
-    public string? Icon => "lucide:file-code";
+        "Read C# source by method/property/constructor, class body, or raw line range.";
 
     public object JsonSchema => new
     {
         type = "object",
         properties = new
         {
-            path = new { type = "string", description = "File path or indexed file name. Examples: '/abs/path/CompShield.cs', 'CompShield.cs', 'CompShield'." },
+            path = new { type = "string", minLength = 1, description = "File path or indexed file name. Examples: '/abs/path/CompShield.cs', 'CompShield.cs', 'CompShield'." },
             methodName = new
             {
                 type = "string",
+                minLength = 1,
                 description =
                     "Member to extract: method ('CompTick'), property ('Label'), constructor (class name or '.ctor'), indexer ('this'), or operator ('+')."
             },
             className = new
             {
                 type = "string",
+                minLength = 1,
                 description = "Optional: The class name to resolve ambiguity if multiple classes have the same member name."
             },
             extractClass = new
             {
                 type = "string",
+                minLength = 1,
                 description = "Optional: Extract the entire class/struct/interface body by name. Example: 'CompShield'."
             },
             startLine = new
             {
                 type = "integer",
+                minimum = 0,
+                @default = 0,
                 description = "Optional 0-based start line for raw read mode (used when methodName/extractClass is not set)."
             },
             lineCount = new
             {
                 type = "integer",
+                minimum = 1,
+                maximum = 2000,
+                @default = 150,
                 description = "Optional number of lines for raw read mode. Default is 150."
             }
         },
-        required = new[] { "path" }
+        required = new[] { "path" },
+        additionalProperties = false
     };
 
     public async Task<ToolResult> ExecuteAsync(JsonElement args, CancellationToken cancellationToken, IProgress<double>? progress = null)

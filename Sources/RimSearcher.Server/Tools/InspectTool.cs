@@ -33,9 +33,7 @@ public class InspectTool : ITool
     public string Name => "rimworld-searcher__inspect";
 
     public string Description =>
-        "Inspect a RimWorld def or C# type in depth. For defs, resolves ParentName inheritance into merged XML and extracts linked C# classes. For C# types, returns inheritance graph and class outline. Tested with 'Apparel_ShieldBelt' and 'RimWorld.CompShield'.";
-
-    public string? Icon => "lucide:eye";
+        "Inspect a RimWorld def or C# type. Def mode resolves inherited XML; type mode shows inheritance and outline.";
 
     public object JsonSchema => new
     {
@@ -45,10 +43,12 @@ public class InspectTool : ITool
             name = new
             {
                 type = "string",
+                minLength = 1,
                 description = "Exact DefName or C# type name. Examples: 'Apparel_ShieldBelt', 'RimWorld.CompShield'."
             }
         },
-        required = new[] { "name" }
+        required = new[] { "name" },
+        additionalProperties = false
     };
 
     public async Task<ToolResult> ExecuteAsync(JsonElement args, CancellationToken cancellationToken, IProgress<double>? progress = null)

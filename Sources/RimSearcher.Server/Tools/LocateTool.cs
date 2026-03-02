@@ -18,9 +18,7 @@ public class LocateTool : ITool
     public string Name => "rimworld-searcher__locate";
 
     public string Description =>
-        "Fuzzy locate RimWorld C# types/members and XML defs. Supports typo tolerance, CamelCase shortcuts (e.g., 'JDW' -> 'JobDriver_Wait'), and filters (type:, method:, field:, def:). Tested: 'def:Apparel_ShieldBelt' returns ranked def hits.";
-
-    public string? Icon => "lucide:map-pin";
+        "Fuzzy locate RimWorld C# types/members and XML defs. Supports filters: type:, method:, field:, def:.";
 
     public object JsonSchema => new
     {
@@ -30,17 +28,19 @@ public class LocateTool : ITool
             query = new
             {
                 type = "string",
+                minLength = 1,
                 description =
                     "Search text or filtered query. Examples: 'Apparel_ShieldBelt', 'RimWorld.Pawn', 'def:Apparel_ShieldBelt', 'method:CompTick'."
             }
         },
-        required = new[] { "query" }
+        required = new[] { "query" },
+        additionalProperties = false
     };
 
-    public async Task<ToolResult> ExecuteAsync(JsonElement args, CancellationToken cancellationToken, IProgress<double>? progress = null)
+    public Task<ToolResult> ExecuteAsync(JsonElement args, CancellationToken cancellationToken, IProgress<double>? progress = null)
     {
         var rawQuery = args.GetProperty("query").GetString();
-        if (string.IsNullOrEmpty(rawQuery)) return new ToolResult("Query cannot be empty.", true);
+        if (string.IsNullOrEmpty(rawQuery)) return Task.FromResult(new ToolResult("Query cannot be empty.", true));
 
         cancellationToken.ThrowIfCancellationRequested();
 
@@ -155,13 +155,13 @@ public class LocateTool : ITool
 
         if (!hasResults)
         {
-            return new ToolResult(
+            return Task.FromResult(new ToolResult(
                 $"No results for '{rawQuery}'.\n\n" +
                 "Try: partial names, query filters (type:, method:, field:, def:), or search_regex for patterns.",
-                true);
+                true));
         }
 
-        return new ToolResult(sb.ToString());
+        return Task.FromResult(new ToolResult(sb.ToString()));
     }
 
     private static List<(string TypeName, double Score)> CollapseTypeAliases(List<(string TypeName, double Score)> types)

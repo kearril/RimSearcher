@@ -15,9 +15,7 @@ public class SearchRegexTool : ITool
     public string Name => "rimworld-searcher__search_regex";
 
     public string Description =>
-        "Regex search across indexed C# and XML files. Returns grouped file results with line previews. Shows up to 3 matches per file and up to 50 files in output. Tested: pattern 'class.*:.*ThingComp' with fileFilter '.cs' returns broad inheritance matches.";
-
-    public string? Icon => "lucide:search-code";
+        "Regex search across indexed C# and XML files. Supports optional extension filter (e.g., '.cs').";
 
     public object JsonSchema => new
     {
@@ -27,12 +25,14 @@ public class SearchRegexTool : ITool
             pattern = new
             {
                 type = "string",
+                minLength = 1,
                 description = "Regex pattern to search. Examples: '<thingClass>Apparel</thingClass>', 'void CompTick\\(\\)', 'class.*:.*ThingComp'."
             },
-            ignoreCase = new { type = "boolean", description = "Whether to ignore case, defaults to true." },
+            ignoreCase = new { type = "boolean", @default = true, description = "Whether to ignore case, defaults to true." },
             fileFilter = new { type = "string", description = "Optional extension filter such as '.cs' or '.xml'." }
         },
-        required = new[] { "pattern" }
+        required = new[] { "pattern" },
+        additionalProperties = false
     };
 
     public async Task<ToolResult> ExecuteAsync(JsonElement args, CancellationToken cancellationToken, IProgress<double>? progress = null)
