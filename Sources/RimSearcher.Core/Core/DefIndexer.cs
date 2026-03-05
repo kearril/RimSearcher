@@ -245,6 +245,9 @@ public class DefIndexer
     {
         var defNameSource = (IEnumerable<KeyValuePair<string, DefLocation>>?)_frozenDefNameIndex ?? _defNameIndex;
         var parentNameSource = (IEnumerable<KeyValuePair<string, DefLocation>>?)_frozenParentNameIndex ?? _parentNameIndex;
+        var labelSource = _frozenLabelIndex != null
+            ? _frozenLabelIndex.SelectMany(kv => kv.Value.Select(loc => (Label: kv.Key, Location: loc)))
+            : _labelIndex.SelectMany(kv => kv.Value.Select(loc => (Label: kv.Key, Location: loc)));
         
         var scoredResults = defNameSource
             .Select(kv => new
@@ -257,12 +260,11 @@ public class DefIndexer
                 Loc = kv.Value,
                 Score = FuzzyMatcher.CalculateFuzzyScore(kv.Key, query) * 1.0 * (kv.Value.IsAbstract ? 0.5 : 1.0)
             }))
-            .Concat(_labelIndex.SelectMany(kv =>
-                kv.Value.Select(loc => new
-                {
-                    Loc = loc,
-                    Score = FuzzyMatcher.CalculateFuzzyScore(kv.Key, query) * 0.8 * (loc.IsAbstract ? 0.5 : 1.0)
-                })))
+            .Concat(labelSource.Select(entry => new
+            {
+                Loc = entry.Location,
+                Score = FuzzyMatcher.CalculateFuzzyScore(entry.Label, query) * 0.8 * (entry.Location.IsAbstract ? 0.5 : 1.0)
+            }))
             .Where(x => x.Score > 0)
             .GroupBy(x => $"{x.Loc.DefType}/{x.Loc.DefName}")
             .Select(g => g.OrderByDescending(x => x.Score).First())
