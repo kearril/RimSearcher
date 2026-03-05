@@ -23,7 +23,7 @@ public class ReadCodeTool : ITool
         type = "object",
         properties = new
         {
-            path = new { type = "string", minLength = 1, description = "File path or indexed file name. Examples: '/abs/path/CompShield.cs', 'CompShield.cs', 'CompShield'." },
+            path = new { type = "string", minLength = 1, description = "File path or indexed file name. Examples: 'CompShield','CompShield.cs','/abs/path/CompShield.cs'." },
             methodName = new
             {
                 type = "string",

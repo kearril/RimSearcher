@@ -44,7 +44,7 @@ public class InspectTool : ITool
             {
                 type = "string",
                 minLength = 1,
-                description = "Exact DefName or C# type name. Examples: 'Apparel_ShieldBelt', 'RimWorld.CompShield'."
+                description = "Exact DefName or C# type name. Examples: 'Apparel_ShieldBelt', 'CompShield'."
             }
         },
         required = new[] { "name" },
