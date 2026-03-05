@@ -6,7 +6,7 @@ namespace RimSearcher.Server;
 
 public static class UpdateChecker
 {
-    public const string CurrentVersion = "2.6";//版本号
+    public const string CurrentVersion = "2.7";//版本号
     private const string GitHubApiUrl = "https://api.github.com/repos/kearril/RimSearcher/releases/latest";
     private static string CacheFilePath
     {
