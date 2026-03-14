@@ -225,9 +225,6 @@ Tool Layer
 
 ## 5. 快速开始
 
-#### 视频教程
-- [B站视频教程（点击跳转）](https://www.bilibili.com/video/BV1w1cJz7E9t?vd_source=624604839a08e42cea3a8cb45151b201)
-
 ### 前置要求
 > 运行 Release 版 `RimSearcher.Server.exe` 需要 [.NET 10 Runtime](https://dotnet.microsoft.com/download/dotnet/10.0)；
 > 
