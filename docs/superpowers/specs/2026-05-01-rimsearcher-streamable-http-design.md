@@ -1,133 +1,134 @@
-# RimSearcher Streamable HTTP Transport Design
+# RimSearcher Streamable HTTP 传输设计
 
-## Context
+## 背景
 
-RimSearcher is currently a local MCP server launched as an executable over stdio. Each Agent that configures the executable starts its own process, which means each Agent loads or builds its own RimWorld C# and XML indexes. The source data is effectively static in the target workflow: a single decompiled RimWorld source folder and XML data folder that do not change during normal use.
+RimSearcher 当前是一个通过 stdio 启动的本地 MCP server，启动形式是可执行文件。每个把该 exe 配置为 MCP server 的 Agent 都会启动自己的进程，也就会各自加载或构建一份 RimWorld C# 与 XML 索引。
 
-The goal is to let users run one shared local MCP server process and connect multiple compatible clients to it, while preserving the current stdio behavior for clients that still launch the executable directly.
+目标使用场景里的源码数据基本是静态的：一个反编译后的 RimWorld C# 源码目录，以及一个 RimWorld XML 数据目录，正常使用时不会频繁变化。
 
-## Scope
+本设计的目标是让用户可以手动启动一个共享的本地 MCP server 进程，并让多个支持 URL MCP 配置的客户端连接到它；同时保留当前 stdio 行为，继续兼容仍然直接启动 exe 的客户端。
 
-This design adds an explicit transport selector to the existing executable.
+## 范围
 
-- Default behavior remains stdio.
-- A new Streamable HTTP mode can be started manually.
-- Existing tools and index behavior remain unchanged.
-- The design does not include stdio-to-HTTP proxying, automatic background launch, service discovery, config fingerprinting, lock files, or multi-instance management.
+本设计为现有可执行文件增加显式 transport 选择。
 
-## User-Facing Behavior
+- 默认行为仍然是 stdio。
+- 新增一个可手动启动的 Streamable HTTP 模式。
+- 现有工具和索引行为保持不变。
+- 本设计不包含 stdio-to-HTTP proxy、自动后台拉起、服务发现、配置指纹、锁文件或多实例管理。
 
-Default stdio mode stays compatible with the current README examples:
+## 用户可见行为
+
+默认 stdio 模式继续兼容当前 README 中的用法：
 
 ```powershell
 RimSearcher.Server.exe
 ```
 
-Shared local HTTP mode is started manually:
+共享本地 HTTP 模式由用户手动启动：
 
 ```powershell
 RimSearcher.Server.exe --transport streamable-http --host 127.0.0.1 --port 51234 --mount-path /mcp
 ```
 
-Clients that support URL-based MCP servers can connect to:
+支持 URL 形式 MCP server 的客户端可以连接到：
 
 ```text
 http://127.0.0.1:51234/mcp
 ```
 
-The executable continues to read `RIMSEARCHER_CONFIG` first and falls back to `config.json` beside the executable when the environment variable is not set.
+可执行文件继续优先读取 `RIMSEARCHER_CONFIG`。未设置该环境变量时，回退读取 exe 同目录下的 `config.json`。
 
-## CLI Options
+## CLI 选项
 
-Add these command-line options:
+新增以下命令行选项：
 
-- `--transport`: one of `stdio` or `streamable-http`; default `stdio`.
-- `--host`: HTTP bind host; default `127.0.0.1`.
-- `--port`: HTTP bind port; default `51234`.
-- `--mount-path`: MCP HTTP endpoint path; default `/mcp`.
+- `--transport`：可选值为 `stdio` 或 `streamable-http`；默认 `stdio`。
+- `--host`：HTTP 绑定地址；默认 `127.0.0.1`。
+- `--port`：HTTP 绑定端口；默认 `51234`。
+- `--mount-path`：MCP HTTP endpoint 路径；默认 `/mcp`。
 
-HTTP options are only used when `--transport streamable-http` is selected.
+HTTP 相关选项只在 `--transport streamable-http` 时生效。
 
-## Architecture
+## 架构
 
-The existing startup sequence should remain the single source of truth:
+现有启动流程应继续作为唯一的初始化路径：
 
-1. Set console encoding.
-2. Load `AppConfig`.
-3. Initialize `PathSecurity`.
-4. Load index cache or scan source paths.
-5. Freeze indexes.
-6. Register the six existing MCP tools.
-7. Start the selected transport.
+1. 设置 Console 编码。
+2. 加载 `AppConfig`。
+3. 初始化 `PathSecurity`。
+4. 加载索引缓存，或扫描源码路径并构建索引。
+5. 冻结索引。
+6. 注册现有六个 MCP 工具。
+7. 启动所选 transport。
 
-To avoid duplicating startup logic, the current program flow can be factored into small pieces only where needed:
+为了避免复制启动逻辑，可以只在必要处小幅拆分当前程序流程：
 
-- A runtime object owns tool registration, JSON-RPC request handling, concurrency limiting, cancellation, and logging notification behavior.
-- The stdio transport reads newline-delimited JSON-RPC from stdin and writes JSON-RPC messages to stdout, matching current behavior.
-- The HTTP transport exposes a local endpoint and reuses the same request handling path for JSON-RPC requests.
+- runtime 对象负责工具注册、JSON-RPC 请求处理、并发限制、取消处理和 logging notification 行为。
+- stdio transport 从 stdin 读取换行分隔的 JSON-RPC，并向 stdout 写出 JSON-RPC 消息，保持当前行为。
+- HTTP transport 暴露本地 endpoint，并复用同一套 JSON-RPC 请求处理路径。
 
-The existing `Tools/*` and `RimSearcher.Core/*` behavior should not be rewritten for this feature.
+本功能不应重写现有 `Tools/*` 和 `RimSearcher.Core/*` 的行为。
 
-## HTTP Protocol Behavior
+## HTTP 协议行为
 
-The initial Streamable HTTP implementation is request-response focused:
+初版 Streamable HTTP 实现聚焦 request-response：
 
-- `POST /mcp` accepts one JSON-RPC request, notification, or response body.
-- Requests with an `id` return one JSON-RPC response with `Content-Type: application/json`.
-- Notifications without an `id` return `202 Accepted` with no response body.
-- `GET /mcp` returns `405 Method Not Allowed` in the initial implementation.
-- `initialize`, `notifications/initialized`, `tools/list`, `list_tools`, `tools/call`, and `call_tool` keep the same behavior as stdio where the transport permits it.
+- `POST /mcp` 接收一个 JSON-RPC request、notification 或 response body。
+- 带 `id` 的 request 返回一个 JSON-RPC response，`Content-Type` 为 `application/json`。
+- 不带 `id` 的 notification 返回 `202 Accepted`，无响应体。
+- 初版 `GET /mcp` 返回 `405 Method Not Allowed`。
+- `initialize`、`notifications/initialized`、`tools/list`、`list_tools`、`tools/call` 和 `call_tool` 在 transport 允许的范围内保持与 stdio 一致。
 
-Server-to-client logging notifications are straightforward over stdio because stdout is the protocol stream. In the initial HTTP request-response mode, unsolicited outgoing notifications are not delivered over a separate SSE stream. HTTP-mode diagnostics that cannot be returned as JSON-RPC responses should be written to stderr or the normal process logs.
+stdio 下 server-to-client logging notification 很直接，因为 stdout 就是协议流。初版 HTTP request-response 模式不提供独立 SSE stream，因此不主动交付 unsolicited outgoing notification。HTTP 模式下无法作为 JSON-RPC response 返回的诊断信息应写入 stderr 或普通进程日志。
 
-## Security
+## 安全
 
-The default HTTP bind address is `127.0.0.1`. Localhost-only binding is the supported target for this feature.
+默认 HTTP 绑定地址为 `127.0.0.1`。本功能支持的目标使用方式是仅绑定 localhost。
 
-When an `Origin` header is present on HTTP requests, the server should reject non-localhost origins with `403 Forbidden`. This follows the MCP Streamable HTTP guidance for local servers and reduces DNS rebinding risk.
+当 HTTP 请求带有 `Origin` header 时，server 应拒绝非 localhost origin，并返回 `403 Forbidden`。这符合 MCP Streamable HTTP 对本地 server 的安全建议，也能降低 DNS rebinding 风险。
 
-Binding to `0.0.0.0` is not the default and is not the recommended setup. Remote or LAN exposure, authentication, and authorization are outside the scope of this design.
+`0.0.0.0` 不是默认绑定地址，也不是推荐配置。远程或局域网暴露、认证和授权不属于本设计范围。
 
-## Error Handling
+## 错误处理
 
-Startup errors keep the current behavior where possible:
+启动阶段错误应尽量保持当前行为：
 
-- Missing or invalid config is logged.
-- Missing source paths are logged.
-- Cache load failure falls back to rebuild.
-- Cache save failure is logged without failing the server.
+- 配置缺失或无效时记录日志。
+- 源码路径缺失时记录日志。
+- 索引缓存加载失败时回退到重建索引。
+- 索引缓存保存失败时记录日志，但不阻止 server 运行。
 
-HTTP-specific errors should be explicit:
+HTTP 特有错误应明确返回：
 
-- Unsupported HTTP methods return `405`.
-- Invalid JSON returns a JSON-RPC parse error when possible.
-- Invalid Origin returns `403`.
-- Port bind failure is reported by the host startup failure and should be visible in stderr.
+- 不支持的 HTTP method 返回 `405`。
+- JSON 无效时尽可能返回 JSON-RPC parse error。
+- 非法 Origin 返回 `403`。
+- 端口绑定失败由 host 启动错误暴露，并应能在 stderr 中看到。
 
-## Testing
+## 测试
 
-Automated tests should focus on transport selection and request handling without requiring a real RimWorld source tree:
+自动化测试应聚焦 transport 选择和请求处理，不要求真实 RimWorld 源码树：
 
-- CLI parsing covers default stdio values and explicit Streamable HTTP values.
-- JSON-RPC handling covers `initialize` and `tools/list`.
-- HTTP smoke test posts `initialize` to the configured mount path and verifies `serverInfo`.
-- Notification handling verifies that an HTTP notification returns `202 Accepted`.
-- `GET /mcp` returns `405 Method Not Allowed`.
+- CLI 解析覆盖默认 stdio 值和显式 Streamable HTTP 值。
+- JSON-RPC 处理覆盖 `initialize` 和 `tools/list`。
+- HTTP smoke test 向配置的 mount path POST `initialize`，并验证 `serverInfo`。
+- notification 处理验证 HTTP notification 返回 `202 Accepted`。
+- `GET /mcp` 返回 `405 Method Not Allowed`。
 
-Manual verification should cover:
+手动验收应覆盖：
 
-- Existing stdio configuration still lists all six tools.
-- Manual HTTP startup reaches `http://127.0.0.1:51234/mcp`.
-- A URL-configured MCP client can call `locate`.
-- Two clients connected to the same HTTP URL share one server process.
+- 现有 stdio 配置仍然能列出全部六个工具。
+- 手动启动 HTTP 后可访问 `http://127.0.0.1:51234/mcp`。
+- 使用 URL 配置的 MCP 客户端可以调用 `locate`。
+- 两个连接到同一 HTTP URL 的客户端共享同一个 server 进程。
 
-## Documentation
+## 文档
 
-Update README with:
+README 需要更新：
 
-- Existing stdio usage preserved as the default.
-- New shared local HTTP command.
-- URL-based MCP client example.
-- A short note that stdio clients still create one process per client.
-- A short warning that HTTP mode is intended for localhost use.
-
+- 保留现有 stdio 用法，并说明它仍是默认模式。
+- 新增共享本地 HTTP 服务启动命令。
+- 新增 URL 形式 MCP 客户端配置示例。
+- 简短说明 stdio 客户端仍会每个客户端启动一个进程。
+- 简短提醒 HTTP 模式面向 localhost 使用。
