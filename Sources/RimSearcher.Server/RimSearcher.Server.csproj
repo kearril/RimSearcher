@@ -23,4 +23,8 @@
       <ProjectReference Include="..\RimSearcher.Core\RimSearcher.Core.csproj" />
     </ItemGroup>
 
+    <ItemGroup>
+      <FrameworkReference Include="Microsoft.AspNetCore.App" />
+    </ItemGroup>
+
 </Project>
