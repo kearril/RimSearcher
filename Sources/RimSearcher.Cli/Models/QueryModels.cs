@@ -30,6 +30,14 @@ internal sealed record FieldValue(
     [property: JsonPropertyName("field_path")] string FieldPath,
     [property: JsonPropertyName("field_value")] string Value);
 
+/// <summary>
+/// fields 查询结果：可见字段列表 + 是否因 limit 或噪声过滤被截断。
+/// 不直接序列化——命令层输出 <see cref="Values"/>，截断提示走 stderr。
+/// </summary>
+internal sealed record FieldListResult(
+    IReadOnlyList<FieldValue> Values,
+    bool IsTruncated);
+
 internal sealed record TypeCount(
     [property: JsonPropertyName("def_type")] string DefType,
     [property: JsonPropertyName("count")] int Count);
