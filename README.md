@@ -148,7 +148,7 @@ rimsearcher list [--type T] [--mod M] [--limit N] [--offset N]
 rimsearcher get <defName> [--type T] [--brief]
 ```
 
-按名称定位 Def。`--brief` 提取关联的 C# 类型名（`thingClass`、`compClasses`），
+按名称定位 Def。`--brief` 提取 Def 中全部 `*Class` 桥接字段值（`thingClass`、`compClass`、`workerClass`、`hediffClass` 等，类型无关），
 作为反编译 MCP 的搜索入口。多类型歧义时列出候选项。
 
 ### find — 反向查找
@@ -216,7 +216,7 @@ Skill 文件定义标准分析管线，AI 加载后自动按流程定位源码�
 ### DataMod — 游戏内导出
 
 RimSearcher.DataMod 是一个游戏内模组，运行时通过反射扫描 `DefDatabase<T>`，将当前模组环境
-的所有 Def 数据导出为 SQLite 数据库。导出的 `defs.db` 包含完整的 Def 序列化 JSON、字段值表
+的所有 Def 数据导出为 SQLite 数据库。导出的 `defs.db` 包含 Def 序列化 JSON（深度上限 100）、字段值表
 和 FTS5 全文索引，供 CLI 查询使用。
 
 ## 运行依赖
