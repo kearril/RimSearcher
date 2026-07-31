@@ -121,7 +121,7 @@ rimsearcher get <defName> [--type T] [--brief]
 |---|---|---|
 | `defName` | required | Exact def_name match |
 | `--type` | null | Required when defName matches multiple def_types |
-| `--brief` | false | Return only `thing_class` + `comp_classes` instead of full JSON |
+| `--brief` | false | Return only `classes[]` (all `*Class` bridge fields) instead of full JSON |
 
 **Output** (default): Full `full_data` JSON object — the complete Def serialization.
 
@@ -166,12 +166,6 @@ rimsearcher find <fieldPath> <value> [--type T] [--mod M] [--limit N]
 
 **Output**: Array of `{def_name, def_type, label, mod_name, package_id, field_path, field_value}`.
 
-**Exit code**: 0 hits → exit 2 (stdout stays `[]`, stderr hints at `search`); hits → exit 0.
-Scripts can distinguish "not found" (2) from query failure (1).
-
-**Truncation**: when `--limit` or the internal fetch window (`limit*2`, cap 40000) is reached, stderr prints
-`Hint: reached limit N; results may be truncated, use --limit to increase`; detection uses an exact COUNT, no false positives.
-
 **0 results**: A hint is written to stderr suggesting `rimsearcher search "value"`.
 
 **Key distinction**:
@@ -206,6 +200,9 @@ rimsearcher fields <defName> --type <T> [--limit N]
 **Noise filtering**: The following are excluded:
 - Fields matching: `debugRandomId`, `defNameHash`, `generated`, `ignoreConfigErrors`, `ignoreIllegalLabelCharacterConfigError`, `index`, `shortHash`
 - Fields with path prefix `modContentPack.`
+
+**Truncation**: when `--limit` or the internal fetch window (`limit*2`, cap 40000) is reached, stderr prints
+`Hint: reached limit N; results may be truncated, use --limit to increase`; detection uses an exact COUNT, no false positives.
 
 **Examples**:
 ```bash

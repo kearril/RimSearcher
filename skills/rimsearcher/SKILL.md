@@ -48,7 +48,6 @@ Match the shortest path. Unsure? Default to **Full Analysis**.
 ### Quick Lookup
 User knows the defName or wants to browse/enumerate. No search needed.
   `get` / `fields` / `list` / `types` / `mods` / `values` → done
-→ Verify for `get`/`fields`/`list`; skip for `types`/`mods`/`values`
 
 ### Full Analysis *(default)*
 User wants to understand a game mechanic end-to-end.
@@ -63,15 +62,13 @@ User wants to understand a game mechanic end-to-end.
    `load_assembly(assemblyPath="<path>", contextAlias="<alias>")` — only for a new assembly path
    Confirm the context has IL bodies (decompile a known method: real body, not `public extern` stubs — reference assemblies have none).
    For each selected C# type, use `resolve_member_id` when its name is fully qualified; otherwise use `search_symbols`. Then call `get_decompiled_source` with the resolved `memberId`.
-4. Read `references/decompiler-mcp.md` only for context loading, recovery, inheritance/call-graph analysis, IL/transpiler work, or version comparison.
-5. Verify — cross-check the Def values against the decompiled formula (see Verify section).
+4. Verify — cross-check the Def values against the decompiled formula (see Verify section).
 
 ### Reverse Lookup
 User asks "which Defs use this C# class?"
 
 1. `find <fieldPath> <fullClassName>`    ← value is exact match
 2. Optional: `get --brief` on key results → decompiler
-   → Read `references/decompiler-mcp.md` only for context loading, recovery, inheritance/call-graph analysis, IL/transpiler work, or version comparison.
 3. Verify
 
 ### Direct Source
@@ -81,7 +78,6 @@ User names a C# type directly. Skip CLI.
    `list_contexts` → `select_context` or ask user for paths
    `load_assembly(assemblyPath="<path>", contextAlias="<alias>")` — only for a new assembly path
    For a fully-qualified type or member name, use `resolve_member_id`; otherwise use `search_symbols(query="<ClassName>")`.
-2. Read `references/decompiler-mcp.md` only for context loading, recovery, inheritance/call-graph analysis, IL/transpiler work, or version comparison.
 
 ## Verify
 
@@ -90,6 +86,7 @@ User names a C# type directly. Skip CLI.
 Verification means: **cross-check the Def numbers you found against the decompiled source** — does the located method/class actually reference the fields you extracted (baseValue, curve points, stage offsets)? Def values and formula constants must agree. If they do not, the field path or the decompiled target is wrong — retrace.
 
 Read `references/cli-reference.md` only when command parameters, output fields, FTS syntax, pagination/filtering, database schema, or an unexpected CLI result matters.
+Read `references/decompiler-mcp.md` only for context loading, recovery, inheritance/call-graph analysis, IL/transpiler work, or version comparison.
 
 ## Guardrails
 
