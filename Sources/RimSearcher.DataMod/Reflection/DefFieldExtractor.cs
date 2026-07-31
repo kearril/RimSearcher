@@ -1,4 +1,5 @@
 using System.Collections;
+using System.Globalization;
 using Verse;
 
 namespace RimSearcher.DataMod.Reflection;
@@ -6,12 +7,14 @@ namespace RimSearcher.DataMod.Reflection;
 /// <summary>
 /// 遍历 Def 对象树并提取可检索的字段值，供 field_values 表与 FTS 检索文本使用。
 /// 路径格式：顶层字段名、嵌套用 "." 连接、列表项用 "[i]"、字典项用 ".key"；
-/// 深度上限 3、单 Def 上限 5000 条，噪声字段与 modContentPack 前缀被过滤。
+/// 深度上限 4（覆盖 stages[i].statOffsets[i].value 等 mod 开发高频路径，
+/// 深度 4 的对象其标量叶子可达路径深度 5）、单 Def 上限 20000 条（达上限返回 true 供导出方记录），
+/// 噪声字段与 modContentPack 前缀被过滤；标量一律用不变量文化格式（bool 小写）。
 /// </summary>
 internal static class DefFieldExtractor
 {
-    private const int MaxDepth = 3;
-    private const int MaxValuesPerDef = 5000;
+    private const int MaxDepth = 4;
+    private const int MaxValuesPerDef = 20000;
 
     // 注意：以下名单与 CLI 的 FieldRepository.NoiseFieldNames 内容一致，修改时必须同步两侧。
     // 两侧语义不同：DataMod 按完整路径精确过滤，CLI 按路径末段匹配过滤。
@@ -29,8 +32,9 @@ internal static class DefFieldExtractor
 
     /// <summary>
     /// 提取指定 Def 的全部字段值：写入 inserts 供入库，同时收集到 allTexts 供 FTS 文本构建。
+    /// 返回是否达单 Def 上限（true = 仍有字段未提取，导出方应记录日志）。
     /// </summary>
-    public static void Extract(
+    public static bool Extract(
         Def def,
         int defId,
         List<(int DefId, string FieldPath, string FieldValue)> inserts,
@@ -39,6 +43,7 @@ internal static class DefFieldExtractor
         var visited = new HashSet<object>();
         int count = 0;
         ExtractRecursive(def, defId, string.Empty, inserts, allTexts, visited, 0, ref count);
+        return count >= MaxValuesPerDef;
     }
 
     private static void ExtractRecursive(
@@ -62,6 +67,10 @@ internal static class DefFieldExtractor
             visited.Add(value);
         }
 
+        // 委托字段的运行时兜底（同 DefJsonSerializer）：函数指针不是数据，不提取。
+        if (value is Delegate)
+            return;
+
         try
         {
             if (value is IList list)
@@ -76,7 +85,7 @@ internal static class DefFieldExtractor
                 return;
             }
 
-            if (ReflectionTraversalPolicy.IsExcludedNamespace(type))
+            if (ReflectionTraversalPolicy.IsExcludedType(type))
                 return;
 
             ExtractObjectFields(value, type, defId, pathPrefix, inserts, allTexts, visited, depth, ref count);
@@ -115,7 +124,19 @@ internal static class DefFieldExtractor
                 if (!TryAddValue(defId, itemPath, itemType.FullName ?? itemType.Name, inserts, allTexts, ref count))
                     return;
             }
-            else if (item != null && item.GetType().IsClass && !(item is ValueType))
+            else if (item is ValueType valueItem)
+            {
+                string? scalarText = ToScalarText(valueItem);
+                if (scalarText != null
+                    && !TryAddValue(defId, itemPath, scalarText, inserts, allTexts, ref count))
+                    return;
+            }
+            else if (item is Def defReference)
+            {
+                if (!TryAddValue(defId, itemPath, defReference.defName, inserts, allTexts, ref count))
+                    return;
+            }
+            else if (item != null && item.GetType().IsClass)
             {
                 ExtractRecursive(item, defId, itemPath, inserts, allTexts, visited, depth + 1, ref count);
             }
@@ -137,7 +158,7 @@ internal static class DefFieldExtractor
             if (count >= MaxValuesPerDef)
                 return;
 
-            string key = entry.Key?.ToString() ?? string.Empty;
+            string key = entry.Key == null ? string.Empty : ToScalarText(entry.Key) ?? string.Empty;
             string entryPath = string.IsNullOrEmpty(pathPrefix)
                 ? key
                 : $"{pathPrefix}.{key}";
@@ -152,7 +173,19 @@ internal static class DefFieldExtractor
                 if (!TryAddValue(defId, entryPath, valueType.FullName ?? valueType.Name, inserts, allTexts, ref count))
                     return;
             }
-            else if (entry.Value != null && entry.Value.GetType().IsClass && !(entry.Value is ValueType))
+            else if (entry.Value is ValueType valueItem)
+            {
+                string? scalarText = ToScalarText(valueItem);
+                if (scalarText != null
+                    && !TryAddValue(defId, entryPath, scalarText, inserts, allTexts, ref count))
+                    return;
+            }
+            else if (entry.Value is Def defReference)
+            {
+                if (!TryAddValue(defId, entryPath, defReference.defName, inserts, allTexts, ref count))
+                    return;
+            }
+            else if (entry.Value != null && entry.Value.GetType().IsClass)
             {
                 ExtractRecursive(entry.Value, defId, entryPath, inserts, allTexts, visited, depth + 1, ref count);
             }
@@ -200,7 +233,7 @@ internal static class DefFieldExtractor
             }
             else if (fieldValue is ValueType)
             {
-                string? scalarText = fieldValue.ToString();
+                string? scalarText = ToScalarText(fieldValue);
                 if (scalarText != null
                     && !TryAddValue(defId, fieldPath, scalarText, inserts, allTexts, ref count))
                     return;
@@ -210,18 +243,24 @@ internal static class DefFieldExtractor
                 if (!TryAddValue(defId, fieldPath, defReference.defName, inserts, allTexts, ref count))
                     return;
             }
-            else if (fieldValue.GetType().IsEnum)
-            {
-                string? enumText = fieldValue.ToString();
-                if (enumText != null
-                    && !TryAddValue(defId, fieldPath, enumText, inserts, allTexts, ref count))
-                    return;
-            }
             else
             {
                 ExtractRecursive(fieldValue, defId, fieldPath, inserts, allTexts, visited, depth + 1, ref count);
             }
         }
+    }
+
+    /// <summary>
+    /// 标量统一格式化：bool 小写，数值与枚举用不变量文化（小数点恒为 "."）。
+    /// 与 DefJsonSerializer 的 simple-value 输出规则对齐（G7/G15 精度不变）。
+    /// </summary>
+    private static string? ToScalarText(object value)
+    {
+        if (value is bool boolean)
+            return boolean ? "true" : "false";
+        if (value is IFormattable formattable)
+            return formattable.ToString(null, CultureInfo.InvariantCulture);
+        return value.ToString();
     }
 
     private static bool TryAddValue(
