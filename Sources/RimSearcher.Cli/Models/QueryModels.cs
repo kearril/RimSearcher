@@ -53,5 +53,4 @@ internal sealed record BriefDef(
     [property: JsonPropertyName("label")] string Label,
     [property: JsonPropertyName("mod_name")] string ModName,
     [property: JsonPropertyName("package_id")] string? PackageId,
-    [property: JsonPropertyName("thing_class")] string? ThingClass,
-    [property: JsonPropertyName("comp_classes")] IReadOnlyList<string> CompClasses);
+    [property: JsonPropertyName("classes")] IReadOnlyList<string> Classes);

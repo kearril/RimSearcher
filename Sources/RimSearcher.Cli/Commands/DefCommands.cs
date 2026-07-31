@@ -39,30 +39,16 @@ internal static class DefCommands
                     Environment.Exit(ExitCodes.NotFound);
                 }
 
+                // 统一提取所有 *Class 桥接字段：不过滤 def_type、不限嵌套深度，
+                // 规则仅为"属性名以 Class 结尾且值为字符串"（排除 useGraphicClass 这类布尔陷阱）。
                 using var document = JsonDocument.Parse(source.FullData);
-                var root = document.RootElement;
-                string? thingClass = root.TryGetProperty("thingClass", out var thingClassElement)
-                    ? thingClassElement.GetString()
-                    : null;
-                var compClasses = new List<string>();
-                if (root.TryGetProperty("comps", out var comps)
-                    && comps.ValueKind == JsonValueKind.Array)
-                {
-                    foreach (var comp in comps.EnumerateArray())
-                    {
-                        if (comp.ValueKind == JsonValueKind.Object
-                            && comp.TryGetProperty("compClass", out var componentClass))
-                        {
-                            var className = componentClass.GetString();
-                            if (className != null)
-                                compClasses.Add(className);
-                        }
-                    }
-                }
+                var classNames = new List<string>();
+                CollectClassFields(document.RootElement, classNames);
 
                 output.Write(new BriefDef(
                     source.DefName, source.DefType, source.Label, source.ModName,
-                    source.PackageId, thingClass, compClasses));
+                    source.PackageId,
+                    classNames.Distinct(StringComparer.Ordinal).OrderBy(name => name, StringComparer.Ordinal).ToArray()));
                 return;
             }
 
@@ -74,5 +60,33 @@ internal static class DefCommands
             }
             Console.WriteLine(fullData);
         });
+    }
+
+    /// <summary>
+    /// 递归收集 JSON 中所有"属性名以 Class 结尾且值为字符串"的字段值，
+    /// 作为 Def 通往 C# 类型的桥接线索（thingClass/compClass/workerClass/hediffClass…）。
+    /// </summary>
+    private static void CollectClassFields(JsonElement element, List<string> classNames)
+    {
+        switch (element.ValueKind)
+        {
+            case JsonValueKind.Object:
+                foreach (var property in element.EnumerateObject())
+                {
+                    if (property.Name.EndsWith("Class", StringComparison.Ordinal)
+                        && property.Value.ValueKind == JsonValueKind.String)
+                    {
+                        var className = property.Value.GetString();
+                        if (!string.IsNullOrEmpty(className))
+                            classNames.Add(className);
+                    }
+                    CollectClassFields(property.Value, classNames);
+                }
+                break;
+            case JsonValueKind.Array:
+                foreach (var item in element.EnumerateArray())
+                    CollectClassFields(item, classNames);
+                break;
+        }
     }
 }
