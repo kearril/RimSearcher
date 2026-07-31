@@ -18,7 +18,10 @@ internal static class FieldCommands
 
         app.Add("fields", ([Argument] string defName, string type, int limit = 1000) =>
         {
-            output.Write(repository.GetFields(defName, type, limit));
+            var result = repository.GetFields(defName, type, limit);
+            output.Write(result.Values);
+            if (result.IsTruncated)
+                Console.Error.WriteLine($"Hint: 已达 limit {limit}，结果可能截断，可用 --limit 增大");
         });
 
         app.Add("values", ([Argument] string fieldPath, int limit = 200) =>
