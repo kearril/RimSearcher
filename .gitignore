@@ -31,3 +31,6 @@ Thumbs.db
 /.omp/
 /ARCHITECTURE.md
 /docs/
+
+# 发布资产暂存目录（不入库）
+.release/
