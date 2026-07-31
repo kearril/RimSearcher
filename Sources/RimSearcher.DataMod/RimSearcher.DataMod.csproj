@@ -6,6 +6,8 @@
         <LangVersion>Latest</LangVersion>
         <Version>3.1.0</Version>
         <Nullable>enable</Nullable>
+        <!-- 显式确定性构建：产物与构建器/时序无关（防御 IDE 后台构建差异）。 -->
+        <Deterministic>true</Deterministic>
         <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
         <AppendRuntimeIdentifierToOutputPath>false</AppendRuntimeIdentifierToOutputPath>
         <OutputPath>..\..\RimSearcher_DataMod/Assemblies</OutputPath>
