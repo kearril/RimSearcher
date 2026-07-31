@@ -5,7 +5,7 @@
         <TargetFramework>net10.0</TargetFramework>
         <LangVersion>Latest</LangVersion>
         <ImplicitUsings>enable</ImplicitUsings>
-        <Version>3.0.2</Version>
+        <Version>3.1.0</Version>
         <AssemblyName>rimsearcher</AssemblyName>
         <Nullable>enable</Nullable>
         <PublishSingleFile>true</PublishSingleFile>
