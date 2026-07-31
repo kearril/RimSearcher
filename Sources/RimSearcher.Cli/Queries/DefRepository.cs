@@ -1,5 +1,6 @@
 using RimSearcher.Cli.Infrastructure;
 using RimSearcher.Cli.Models;
+using RimSearcher.Cli.Search;
 
 namespace RimSearcher.Cli.Queries;
 
@@ -24,7 +25,9 @@ internal sealed class DefRepository
               AND (@type IS NULL OR d.def_type = @type)
               AND (@mod IS NULL OR d.mod_name = @mod)
             """;
-        command.Parameters.AddWithValue("@kw", keyword);
+        // 查询侧 CJK 大词展开：MATCH 的空格是 AND 语义，原始整段中文 token
+        // 在索引中不存在（写侧只保留原文 token + 二元组），必须替换为二元组。
+        command.Parameters.AddWithValue("@kw", CjkBigramExpander.ExpandForMatch(keyword));
         QueryParameters.AddFilters(command, type, mod);
         return (long)command.ExecuteScalar()!;
     }
@@ -43,7 +46,7 @@ internal sealed class DefRepository
             ORDER BY rank
             LIMIT @limit
             """;
-        command.Parameters.AddWithValue("@kw", keyword);
+        command.Parameters.AddWithValue("@kw", CjkBigramExpander.ExpandForMatch(keyword));
         QueryParameters.AddFilters(command, type, mod);
         command.Parameters.AddWithValue("@limit", limit);
 
