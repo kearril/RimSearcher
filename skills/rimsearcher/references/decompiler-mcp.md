@@ -15,6 +15,8 @@ load_assembly(assemblyPath="...", contextAlias="...") ← only for new paths
 When no aliases are registered, ask the user for each assembly path. Auto-name aliases from file names.
 Load once per assembly. `gameDir` auto-discovers Unity layouts; `assemblyPath` is for direct paths.
 
+Reference assemblies (e.g. `krafs.rimworld.ref`) have **no IL**: decompiled source is `public extern` stubs and `get_il` returns `no_il_body`. After selecting a context, confirm it is the real game assembly — `status` shows the path; a known method must decompile to a real body. `find_usages` on a ref context silently returns empty results, which looks like a true negative — do not trust it without the IL check.
+
 ## Search + Read
 
 ```
@@ -25,6 +27,7 @@ get_decompiled_source(memberId="<id-from-search>")
 - Prefer `search_symbols` for fragments, `resolve_member_id` for fully-qualified names like `RimWorld.CompShield.Recharge`.
 - Use `list_members(typeId, mode="signatures")` before guessing method names.
 - `memberId` carries an MVID — follow-up calls auto-route, no need to repeat `contextAlias`.
+- Results paginate: when a response has `hasMore: true`, pass the returned `nextCursor` as `cursor` on the next call to page through (this is normal, not truncation).
 
 ## Inheritance + Call Graph
 

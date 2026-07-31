@@ -13,8 +13,8 @@ The DecompilerServer MCP reads C# source. Never guess an API — look it up.
 ```
 search "keyword"          ← partial / fuzzy match
 get <name> --type <T>     ← exact defName  (!) multi-type -> must add --type
-find <path> <fullValue>   ← C# class → all Defs using it
-list --type T --offset N  ← browsing / paginating
+find <path> <fullValue>   ← C# class → all Defs using it (empty → exit 2)
+list --type T --limit N --offset N  ← browsing / paginating
 fields <name> --type <T>  ← inspect one Def's field tree
 values <path>             ← distinct field values
 types                     ← def_type stats
@@ -32,10 +32,11 @@ CJK is auto-bigram (query-side expansion): `护盾` matches `护盾腰带`, and 
 ### find — value is exact match
 `find <path> <value>` uses `=` equality. `find compClass Shield` matches nothing; you need the full name: `find compClass RimWorld.CompShield`. For partial names, use `search`.
 Values are case-sensitive and formatted canonically: booleans are lowercase — `find showOnPawns true`, not `True`.
+0 hits → stdout `[]` + stderr hint, **exit code 2** (scripts can distinguish "not found" from failure).
 
 ### get — multi-type and `--brief`
 A defName can exist in multiple def_types (e.g. `Human` is in BodyDef, ThingDef, HediffGiverSetDef). Without `--type`, the command exits with code 2 and prints candidates — this is NOT a crash, just add `--type` and retry.
-`--brief` returns `{thing_class, comp_classes[]}` — feed those field names directly to the decompiler.
+`--brief` returns `{classes[]}` — every `*Class`-suffixed string field in the def (thingClass, compClass, workerClass, hediffClass, …), i.e. the C# bridge to the decompiler. Decompile the entries relevant to your question; if none fits, use `fields` and scan `field_path`/`field_value` pairs yourself.
 
 ### output format
 Data-query commands write JSON to stdout; errors and hints go to stderr.
@@ -54,15 +55,16 @@ User wants to understand a game mechanic end-to-end.
 
 1. `search "<query>" --type T`          ← Latin/alphanumeric prefix: append `*`; CJK: use as-is
    If several Defs match, continue only when `def_type`, `label`, and `mod_name` identify the intended Def; otherwise present concise candidates and ask which Def to inspect.
-2. `get <name> --type T --brief`          ← extracts `thing_class`, `comp_classes[]`
-   Decompile every non-null `thing_class` and each `comp_classes` entry.
-   If neither yields the behavior in question, use `fields <name> --type <T>` and inspect every `field_path` / `field_value` pair for fully-qualified C# type names. Paths ending in `Class` are common clues, including `workerClass`, `hediffClass`, and `driverClass`, but are not an exhaustive list.
+2. `get <name> --type T --brief`          ← extracts `classes[]` (all `*Class` bridge fields)
+   Decompile the entries relevant to the question.
+   If none yields the behavior, use `fields <name> --type <T>` and inspect every `field_path` / `field_value` pair for fully-qualified C# type names — paths ending in `Class` are common clues (workerClass, hediffClass, driverClass, …), not an exhaustive list.
 3. Decompiler:
    `list_contexts` → `select_context` or ask user for paths
    `load_assembly(assemblyPath="<path>", contextAlias="<alias>")` — only for a new assembly path
+   Confirm the context has IL bodies (decompile a known method: real body, not `public extern` stubs — reference assemblies have none).
    For each selected C# type, use `resolve_member_id` when its name is fully qualified; otherwise use `search_symbols`. Then call `get_decompiled_source` with the resolved `memberId`.
 4. Read `references/decompiler-mcp.md` only for context loading, recovery, inheritance/call-graph analysis, IL/transpiler work, or version comparison.
-5. Verify
+5. Verify — cross-check the Def values against the decompiled formula (see Verify section).
 
 ### Reverse Lookup
 User asks "which Defs use this C# class?"
@@ -84,6 +86,9 @@ User names a C# type directly. Skip CLI.
 ## Verify
 
 `types`, `mods`, `values`: skip this step.
+
+Verification means: **cross-check the Def numbers you found against the decompiled source** — does the located method/class actually reference the fields you extracted (baseValue, curve points, stage offsets)? Def values and formula constants must agree. If they do not, the field path or the decompiled target is wrong — retrace.
+
 Read `references/cli-reference.md` only when command parameters, output fields, FTS syntax, pagination/filtering, database schema, or an unexpected CLI result matters.
 
 ## Guardrails
@@ -99,9 +104,8 @@ Read `references/cli-reference.md` only when command parameters, output fields, 
 When uncertain about an API you cannot verify, mark it `[UNVERIFIED]` and state what you need.
 
 **Recovery:**
-- `get` without `--type` errors → add `--type` from the candidate list.
-- `find` returns `[]` → use full name or switch to `search`.
-- `search` returns nothing → add `*` or try a shorter term.
+- CLI symptom → action pairs live in the per-command Rules above (`get` multi-type, `find` empty, `search` empty).
 - DecompilerServer errors → follow the `candidates` hint in the structured error.
-- DecompilerServer 无响应 → run `list_contexts`; registered aliases persist across restarts.
+- `no_il_body` / decompiled source shows only `extern` stubs → the context is a reference assembly; select a different alias (see `references/decompiler-mcp.md`).
+- DecompilerServer unresponsive → run `list_contexts`; registered aliases persist across restarts.
 

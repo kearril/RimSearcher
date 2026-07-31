@@ -6,7 +6,7 @@ Data-query commands output JSON to stdout; errors and hints go to stderr. The da
 
 ---
 
-## 数据库 Schema（概念）
+## Database Schema (Conceptual)
 
 ```
 defs:        id, def_name, def_type, label, description, mod_name, package_id, source_file, full_data
@@ -14,24 +14,36 @@ field_values: def_id, field_path, field_value
 defs_fts:    FTS5( def_name, label, description, full_text )  — tokenize='unicode61'
 ```
 
-- `full_data` 是 Def 对象的完整 JSON 序列化（深度上限 100，循环引用输出 `"$cyclic_ref"`；详见「数据限制」）
-- FTS5 写侧 CJK bigram 展开：`"护盾腰带"` 被索引为 `"护盾腰带 护盾 盾腰 腰带"`；查询侧同样展开为二元组（空格 = AND），因此任意长度的连续中文按原样使用即可，如 `粉碎机械族`
-- 输出随加载的 mod 集合变化——不要假设固定数量或 mod 列表
+- `full_data` is the complete JSON serialization of the Def object (depth cap 100; cyclic references output `"$cyclic_ref"`; see Data Limitations below)
+- FTS5 with CJK bigram expansion on write: `护盾腰带` is indexed as `护盾腰带 护盾 盾腰 腰带`; the query side expands the same way (space = AND), so any-length CJK phrases work as-is, e.g. `粉碎机械族`
+- Output varies with the loaded mod set — never assume fixed counts or a fixed mod list
 
 ---
 
-## 数据限制（Data Limitations）
+## Data Limitations
 
-导出内容与游戏运行时状态相关，以下限制是设计使然：
+Export content reflects runtime state; the following limits are by design:
 
-| 限制 | 说明 |
+| Limit | Notes |
 |---|---|
-| 语言依赖 | `label`/`description` 是导出时游戏当前语言的文本，原始 XML 文本在进程内不存在（已翻译）；导出前请切换目标语言 |
-| 抽象 def 不可见 | `Abstract="true"` 的模板从未被实例化，运行时无对象，不进入数据库 |
-| 字段策略 | 收录 public + private 数据字段，镜像游戏反序列化器：排除 `[Unsaved(allowLoading:false)]` 字段、编译器生成字段（`<` 前缀）与委托字段；未被游戏标记的运行时字段（临时缓存/回链）会以 `{}`、原始值或 `"$cyclic_ref"` 形式出现 |
-| 深度 | `full_data` 深度 100 硬防护，超出输出 `"$truncated"`（真实数据最深 29 层，不会误触）；`field_values` 检索层深度 4——`stages[0].statOffsets[0].value` 等路径可达，行为树第 3 层以下的节点请用 `get` 查看 `full_data` |
-| 数值格式 | float/double 用 G7/G15 有效数字（极端精度截断为已知特性）；`NaN`/`±Infinity` 输出为带引号字符串；bool 输出小写 `true`/`false`；`find`/`values` 值匹配大小写敏感 |
-| 路径匹配 | `find`/`values` 的 `fieldPath` 按字面后缀匹配（`%`/`_` 已转义，不会当通配符） |
+| Language | `label`/`description` are in the game language at export time; the original XML text no longer exists in-process (already translated). Switch the game language before exporting |
+| Abstract defs invisible | `Abstract="true"` templates are never instantiated — no runtime object exists, so they are not in the database |
+| Field policy | Public + private data fields mirror the game deserializer: excludes `[Unsaved(allowLoading:false)]`, compiler-generated (`<` prefix) and delegate fields; runtime fields the game did not mark (caches/back-references) appear as `{}`, raw values, or `"$cyclic_ref"` |
+| Depth | `full_data` hard-capped at 100 (`"$truncated"` beyond; real data reaches 29, never triggered); `field_values` retrieval depth 4 — paths like `stages[0].statOffsets[0].value` are reachable; think-tree nodes below level 3: use `get` to read `full_data` |
+| Numeric format | float/double use G7/G15 significant digits (extreme-precision truncation is a known feature); `NaN`/`±Infinity` are quoted strings; bools are lowercase `true`/`false`; `find`/`values` matching is case-sensitive |
+| Path matching | `find`/`values` `fieldPath` matches literally as a suffix (`%`/`_` are escaped, not wildcards) |
+
+---
+
+## Exit Codes
+
+| Code | Meaning |
+|---|---|
+| 0 | Success (including empty result sets of enumerating commands such as `values`/`fields`) |
+| 1 | Runtime or query failure (message on stderr) |
+| 2 | Query found nothing or was ambiguous: `get` not-found / multi-type without `--type`; `find` 0 hits (stdout stays `[]`) |
+
+Unknown commands print usage and exit 0 (retained behavior). Data always goes to stdout, diagnostics to stderr.
 
 ---
 
@@ -58,10 +70,10 @@ rimsearcher search <keyword> [--type T] [--mod M] [--limit N] [--count]
 **Semantics**: FTS5 token matching, not SQL LIKE. The unicode61 tokenizer splits on word boundaries.
 `shield` matches the standalone token `shield` but not `ShieldBelt` (one token). Use `shield*` for prefix.
 
-**CJK**: 连续中文在查询侧展开为相邻二元组（空格 = AND），任意长度按原样使用：
-`护盾`、`粉碎机械族` 都能命中包含对应文本的 Def；单字中文（如 `闪`）因索引无单字 token 而不可命中。
+**CJK**: CJK runs are expanded into bigrams on the query side (space = AND); any length works as-is:
+`护盾` or `粉碎机械族` both hit defs containing the text. Single CJK chars (e.g. `闪`) never match — the index has no single-char tokens.
 
-**FTS 语法错误**：数值或含特殊字符的查询（如 `0.1`）会触发 FTS5 语法错误，stderr 会提示改用 `find`/`values` 精确匹配。
+**FTS syntax errors**: queries with digits or special characters (e.g. `0.1`) trigger an FTS5 syntax error; stderr hints at `find`/`values` for exact matching.
 
 **Examples**:
 ```bash
@@ -113,7 +125,7 @@ rimsearcher get <defName> [--type T] [--brief]
 
 **Output** (default): Full `full_data` JSON object — the complete Def serialization.
 
-**Output** (--brief): `{def_name, def_type, label, mod_name, package_id, thing_class, comp_classes[]}`
+**Output** (--brief): `{def_name, def_type, label, mod_name, package_id, classes[]}` — every string field whose name ends in `Class` (thingClass, compClass, workerClass, hediffClass, …), the def's C# bridge clues for feeding the decompiler. Type-agnostic and recursion-deep; entries are deduplicated and sorted.
 
 **Multi-type behavior**: If `defName` matches multiple types and `--type` is not specified, the command
 exits with code 2 and prints candidate types to stderr:
@@ -154,8 +166,11 @@ rimsearcher find <fieldPath> <value> [--type T] [--mod M] [--limit N]
 
 **Output**: Array of `{def_name, def_type, label, mod_name, package_id, field_path, field_value}`.
 
-**Truncation**: 达到 `--limit` 或内部取行窗口（`limit*2`，上限 40000）时，stderr 输出提示
-`Hint: 已达 limit N，结果可能截断，可用 --limit 增大`；检测基于精确 COUNT，不会误报。
+**Exit code**: 0 hits → exit 2 (stdout stays `[]`, stderr hints at `search`); hits → exit 0.
+Scripts can distinguish "not found" (2) from query failure (1).
+
+**Truncation**: when `--limit` or the internal fetch window (`limit*2`, cap 40000) is reached, stderr prints
+`Hint: reached limit N; results may be truncated, use --limit to increase`; detection uses an exact COUNT, no false positives.
 
 **0 results**: A hint is written to stderr suggesting `rimsearcher search "value"`.
 
