@@ -1,3 +1,7 @@
+using System;
+using System.IO;
+using System.Linq;
+
 namespace RimSearcher.Cli.Maintenance;
 
 internal static class PathInstaller

@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using RimSearcher.Cli.Infrastructure;
 using RimSearcher.Cli.Models;
 using RimSearcher.Cli.Search;

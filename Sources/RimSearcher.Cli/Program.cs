@@ -1,3 +1,5 @@
+using System;
+using System.IO;
 using System.Text;
 using ConsoleAppFramework;
 using RimSearcher.Cli.Commands;

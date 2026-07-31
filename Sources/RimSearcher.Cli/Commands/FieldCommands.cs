@@ -1,3 +1,4 @@
+using System;
 using ConsoleAppFramework;
 using RimSearcher.Cli.Infrastructure;
 using RimSearcher.Cli.Queries;
