@@ -13,7 +13,11 @@ internal static class FieldCommands
             var results = repository.Find(fieldPath, value, type, mod, limit);
             output.Write(results);
             if (results.Count == 0)
+            {
                 Console.Error.WriteLine($"Hint: no exact matches. Try fuzzy search: rimsearcher search \"{value}\"");
+                // 无结果非零退出（stdout 仍输出 []），脚本可用退出码区分"未找到"与"查询失败"。
+                Environment.ExitCode = ExitCodes.NotFound;
+            }
         });
 
         app.Add("fields", ([Argument] string defName, string type, int limit = 1000) =>
@@ -21,7 +25,7 @@ internal static class FieldCommands
             var result = repository.GetFields(defName, type, limit);
             output.Write(result.Values);
             if (result.IsTruncated)
-                Console.Error.WriteLine($"Hint: 已达 limit {limit}，结果可能截断，可用 --limit 增大");
+                Console.Error.WriteLine($"Hint: reached limit {limit}; results may be truncated, use --limit to increase");
         });
 
         app.Add("values", ([Argument] string fieldPath, int limit = 200) =>
