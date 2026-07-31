@@ -7,12 +7,14 @@ namespace RimSearcher.DataMod.Reflection;
 
 /// <summary>
 /// 将 Def 对象序列化为 JSON 文本，供数据库 full_data 列存储。
-/// 输出契约：按反射字段名原样输出（含嵌套对象、集合与字典），
-/// 最大深度 10，循环引用输出 "$cyclic_ref"，嵌套 Def 引用仅输出 defName。
+/// 输出契约：按反射字段名原样输出（含嵌套对象、集合与字典），字段集合与游戏反序列化器一致；
+/// 最大深度 100（真实数据 JSON 深度最深 29 层，哨兵仅防御病态结构），超深输出 "$truncated"，
+/// 循环引用输出 "$cyclic_ref"，嵌套 Def 引用仅输出 defName，
+/// 非有限数（NaN/±Infinity）输出带引号字符串（RFC 8259 允许，保证 JSON 合法）。
 /// </summary>
 internal static class DefJsonSerializer
 {
-    private const int MaxDepth = 10;
+    private const int MaxDepth = 100;
 
     /// <summary>
     /// 序列化指定 Def 的完整 JSON 文本。
@@ -39,13 +41,21 @@ internal static class DefJsonSerializer
 
         if (depth > MaxDepth)
         {
-            builder.Append("\"...\"");
+            builder.Append("\"$truncated\"");
             return;
         }
 
         Type type = value.GetType();
         if (TrySerializeSimpleValue(value, type, builder))
             return;
+
+        // 运行时兜底：object 类型字段持有委托时（字段类型检查无法覆盖），
+        // 委托是函数指针不是数据，输出 null 而非序列化其内部结构。
+        if (value is Delegate)
+        {
+            builder.Append("null");
+            return;
+        }
 
         if (!type.IsValueType)
         {
@@ -84,7 +94,7 @@ internal static class DefJsonSerializer
                 return;
             }
 
-            if (ReflectionTraversalPolicy.IsExcludedNamespace(type))
+            if (ReflectionTraversalPolicy.IsExcludedType(type))
             {
                 builder.Append("{}");
                 return;
@@ -113,10 +123,10 @@ internal static class DefJsonSerializer
                 builder.Append(value);
                 return true;
             case float single:
-                builder.Append(single.ToString("G", CultureInfo.InvariantCulture));
+                AppendNonFiniteAsQuoted(single, builder);
                 return true;
             case double number:
-                builder.Append(number.ToString("G", CultureInfo.InvariantCulture));
+                AppendNonFiniteAsQuoted(number, builder);
                 return true;
             case decimal decimalValue:
                 builder.Append(decimalValue.ToString("G", CultureInfo.InvariantCulture));
@@ -128,6 +138,27 @@ internal static class DefJsonSerializer
 
         AppendQuoted(builder, value.ToString());
         return true;
+    }
+
+    /// <summary>
+    /// 输出浮点数值；非有限数输出带引号字符串（"NaN"/"Infinity"/"-Infinity"），
+    /// 保留信息且产出合法 JSON（RFC 8259：非有限数应序列化为 null 或字符串）。
+    /// 数值格式保持 G（float G7 / double G15，与既有输出契约一致）。
+    /// </summary>
+    private static void AppendNonFiniteAsQuoted(float value, StringBuilder builder)
+    {
+        if (float.IsNaN(value)) { AppendQuoted(builder, "NaN"); return; }
+        if (float.IsPositiveInfinity(value)) { AppendQuoted(builder, "Infinity"); return; }
+        if (float.IsNegativeInfinity(value)) { AppendQuoted(builder, "-Infinity"); return; }
+        builder.Append(value.ToString("G", CultureInfo.InvariantCulture));
+    }
+
+    private static void AppendNonFiniteAsQuoted(double value, StringBuilder builder)
+    {
+        if (double.IsNaN(value)) { AppendQuoted(builder, "NaN"); return; }
+        if (double.IsPositiveInfinity(value)) { AppendQuoted(builder, "Infinity"); return; }
+        if (double.IsNegativeInfinity(value)) { AppendQuoted(builder, "-Infinity"); return; }
+        builder.Append(value.ToString("G", CultureInfo.InvariantCulture));
     }
 
     private static void SerializeList(IList list, StringBuilder builder, HashSet<object> visited, int depth)
