@@ -27,10 +27,11 @@ These are the CLI behaviors that guessing wrong wastes turns.
 
 ### search — use a prefix wildcard for Latin terms
 FTS5 token matching, **not** SQL LIKE. `shield` matches only the standalone token `shield` — it will not match `ShieldBelt` (one token). For Latin/alphanumeric prefix searches, add `*`: `shield*`.
-CJK is auto-bigram: `护盾` already matches `护盾腰带`, so use CJK terms as-is.
+CJK is auto-bigram (query-side expansion): `护盾` matches `护盾腰带`, and multi-char phrases work as-is too (`粉碎机械族`). Single CJK chars (`闪`) cannot match — the index has no single-char tokens.
 
 ### find — value is exact match
 `find <path> <value>` uses `=` equality. `find compClass Shield` matches nothing; you need the full name: `find compClass RimWorld.CompShield`. For partial names, use `search`.
+Values are case-sensitive and formatted canonically: booleans are lowercase — `find showOnPawns true`, not `True`.
 
 ### get — multi-type and `--brief`
 A defName can exist in multiple def_types (e.g. `Human` is in BodyDef, ThingDef, HediffGiverSetDef). Without `--type`, the command exits with code 2 and prints candidates — this is NOT a crash, just add `--type` and retry.
