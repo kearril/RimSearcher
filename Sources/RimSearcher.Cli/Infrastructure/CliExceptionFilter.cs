@@ -30,7 +30,7 @@ internal sealed class CliExceptionFilter(ConsoleAppFilter next) : ConsoleAppFilt
         }
         catch (Exception exception)
         {
-            Console.Error.WriteLine($"错误: {exception.Message}");
+            Console.Error.WriteLine($"Error: {exception.Message}");
             Environment.ExitCode = ExitCodes.Error;
         }
     }
@@ -43,15 +43,15 @@ internal sealed class CliExceptionFilter(ConsoleAppFilter next) : ConsoleAppFilt
             // 因此执行期的 SQLITE_ERROR 基本来自 FTS 语法。按错误码分类，
             // 不依赖随 SQLite 版本变动的消息文案。
             case SqliteError when IsFtsSyntaxError(exception.Message):
-                Console.Error.WriteLine($"FTS 查询语法错误: {exception.Message}");
+                Console.Error.WriteLine($"FTS query syntax error: {exception.Message}");
                 Console.Error.WriteLine(
-                    "Hint: 数值/字段值精确匹配请用 rimsearcher find <字段> <值> 或 rimsearcher values <字段>");
+                    "Hint: use 'rimsearcher find <field> <value>' or 'rimsearcher values <field>' for exact matches");
                 break;
             case SqliteCorrupt or SqliteNotADatabase:
-                Console.Error.WriteLine("数据库文件损坏，请重新导出 defs.db");
+                Console.Error.WriteLine("Database file corrupted, please re-export defs.db");
                 break;
             default:
-                Console.Error.WriteLine($"数据库错误: {exception.Message}");
+                Console.Error.WriteLine($"Database error: {exception.Message}");
                 break;
         }
 

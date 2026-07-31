@@ -27,7 +27,7 @@ internal static class ReleaseUpdater
         }
         catch (Exception exception)
         {
-            Console.Error.WriteLine($"无法检查更新: {exception.Message}");
+            Console.Error.WriteLine($"Failed to check for updates: {exception.Message}");
             Environment.Exit(ExitCodes.Error);
         }
 
@@ -37,7 +37,7 @@ internal static class ReleaseUpdater
 
         if (new Version(latestVersion) <= new Version(currentVersion))
         {
-            Console.WriteLine($"rimsearcher 已是最新 ({currentVersion})");
+            Console.WriteLine($"rimsearcher is up to date ({currentVersion})");
             return;
         }
 
@@ -55,7 +55,7 @@ internal static class ReleaseUpdater
         }
         catch (Exception exception)
         {
-            Console.Error.WriteLine($"下载失败: {exception.Message}");
+            Console.Error.WriteLine($"Download failed: {exception.Message}");
             TryDelete(newExecutablePath);
             Environment.Exit(ExitCodes.Error);
         }
@@ -73,12 +73,12 @@ internal static class ReleaseUpdater
         }
         catch (Exception exception)
         {
-            Console.Error.WriteLine($"更新脚本启动失败: {exception.Message}");
-            Console.WriteLine($"新版本已下载到: {newExecutablePath}");
+            Console.Error.WriteLine($"Failed to start update script: {exception.Message}");
+            Console.WriteLine($"New version downloaded to: {newExecutablePath}");
             Environment.Exit(ExitCodes.Error);
         }
 
-        Console.WriteLine($"已下载 {latestVersion}，正在安装...");
+        Console.WriteLine($"Downloaded {latestVersion}, installing...");
         Environment.Exit(ExitCodes.Success);
     }
 

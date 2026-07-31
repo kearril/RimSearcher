@@ -9,7 +9,7 @@ internal static class PathInstaller
 
         if (currentPath.Split(';').Any(path => path.Equals(executableDirectory, StringComparison.OrdinalIgnoreCase)))
         {
-            Console.WriteLine("rimsearcher 已在 PATH 中。");
+            Console.WriteLine("rimsearcher is already in PATH.");
             return;
         }
 
@@ -18,6 +18,6 @@ internal static class PathInstaller
             currentPath.TrimEnd(';') + ";" + executableDirectory,
             EnvironmentVariableTarget.User);
 
-        Console.WriteLine($"rimsearcher 已加入用户 PATH。\n路径: {executableDirectory}\n重启终端后全局可用。");
+        Console.WriteLine($"rimsearcher added to user PATH.\nPath: {executableDirectory}\nRestart your terminal to use it globally.");
     }
 }
