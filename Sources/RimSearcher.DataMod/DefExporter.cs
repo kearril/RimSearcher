@@ -72,7 +72,8 @@ public static class DefExporter
                     catch (Exception ex)
                     {
                         Log($"序列化失败 {typeName}/{def.defName}: {ex.Message}");
-                        json = "{}";
+                        // 与真实空对象可区分的失败标记，供查询方识别损坏记录。
+                        json = "{\"$serializeError\":true}";
                     }
 
                     string? label = null;
@@ -98,7 +99,9 @@ public static class DefExporter
 
                     // 构建 FTS 检索文本并写入全文索引
                     var fieldTexts = new List<string>();
-                    DefFieldExtractor.Extract(def, defId, fieldValueInserts, fieldTexts);
+                    bool fieldsCapped = DefFieldExtractor.Extract(def, defId, fieldValueInserts, fieldTexts);
+                    if (fieldsCapped)
+                        Log($"字段提取达上限 {typeName}/{def.defName}");
                     var ftsText = SearchTextBuilder.Build(def.defName, label, description, fieldTexts);
 
                     searchWriter.Write(defId, def.defName ?? "", label, description, ftsText);
