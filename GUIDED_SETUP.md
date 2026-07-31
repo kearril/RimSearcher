@@ -41,7 +41,7 @@ You need this path to install the DataMod.
 
 Create a directory and place `rimsearcher.exe` inside.
 
-**Skills:** Download from `https://raw.githubusercontent.com/kearril/RimSearcher/master/skills.zip` for the latest version without waiting for a Release. Extract `skills/rimsearcher/` for later use.
+**Skills:** Download from `https://raw.githubusercontent.com/kearril/RimSearcher/master/skills.zip` — skills are **not published with Releases**; this link always points to the latest version. Extract `skills/rimsearcher/` for later use.
 
 **DecompilerServer:** Visit `https://github.com/pardeike/DecompilerServer` and follow the repository's installation instructions to set up the MCP server.
 

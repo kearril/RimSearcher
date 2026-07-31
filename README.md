@@ -40,7 +40,8 @@ CLI 为其提供全文检索——两者相辅相成，一个负责 C#，一个�
 |---|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | `rimsearcher.exe` | CLI 命令行工具                                                                                                                                                                                                                                                |
 | `RimSearcher_DataMod.zip` | 游戏内def数据导出模组                                                                                                                                                                                                                                         |
-| `skills.zip` | AI 助手技能文件（解压后使用）。Release 中的 skills 文件仅随 `rimsearcher.exe` 或 `RimSearcher_DataMod.zip` 发布而更新，可能滞后；请直接 [下载 skills.zip](https://raw.githubusercontent.com/kearril/RimSearcher/master/skills.zip) 获取仓库最新版。 |
+
+> **skills 不随 Release 发布**：技能文件更新频繁且独立于 CLI/DataMod 功能，始终通过下方「配置 AI 技能」步骤从仓库直接获取最新版（无需等待 Release）。
 
 还需要反编译 MCP：[DecompilerServer](https://github.com/pardeike/DecompilerServer) — 前往官网下载并配置该mcp工具。
 
@@ -70,7 +71,7 @@ rimsearcher install
 
 ### 5. 配置 AI 技能
 
-解压 [下载 skills.zip](https://raw.githubusercontent.com/kearril/RimSearcher/master/skills.zip) 获取的文件（无需等 Release），将 `skills/rimsearcher/` 放入你使用的 AI 助手的 skills 目录。
+解压 [下载 skills.zip](https://raw.githubusercontent.com/kearril/RimSearcher/master/skills.zip) 获取的文件（该链接始终指向仓库最新版，不依赖 Release），将 `skills/rimsearcher/` 放入你使用的 AI 助手的 skills 目录。
 重启 AI 客户端后生效。
 
 ### 6.完成
@@ -83,7 +84,7 @@ rimsearcher install
 | 组件 | 更新方式                                                                                                                                                                            |
 |---|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | **rimsearcher CLI** | 当Release发行可用更新时，终端执行 `rimsearcher update`，自动从 GitHub Release 下载最新版替换当前 exe                                                                                |
-| **rimsearcher Skill** | [下载 skills.zip](https://raw.githubusercontent.com/kearril/RimSearcher/master/skills.zip)，解压后覆盖 skills 目录。无需等 Release 发布新版，每次提交推送后均可获取最新版本。 |
+| **rimsearcher Skill** | [下载 skills.zip](https://raw.githubusercontent.com/kearril/RimSearcher/master/skills.zip)，解压后覆盖 skills 目录。技能文件**不随 Release 发布**，始终从仓库获取最新版——每次提交推送后即可更新。 |
 | **RimSearcher.DataMod** | 从 [Releases](https://github.com/kearril/RimSearcher/releases/latest) 下载新版 `RimSearcher_DataMod.zip`，解压覆盖 Mods 目录即可                                                    |
 
 > 由于 skills 文件是影响ai决策的重要文件，可能频繁更新优化，而它的更新不会影响 CLI 和 datamod 的功能，
