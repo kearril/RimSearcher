@@ -11,7 +11,7 @@ public class RimSearcherMod : Mod
 {
     private const float ButtonWidth = 200f;
     private const float ButtonHeight = 36f;
-    private string _exportPath = "";
+    private string _exportPath;
 
     public RimSearcherMod(ModContentPack content) : base(content)
     {

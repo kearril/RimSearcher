@@ -3,6 +3,9 @@ using System.Data.SQLite;
 
 namespace RimSearcher.DataMod.Export;
 
+/// <summary>
+/// field_values 批量写入：攒批后一次性插入并清空缓存列表。
+/// </summary>
 internal static class FieldValueWriter
 {
     public static void Flush(SQLiteConnection connection, List<(int DefId, string FieldPath, string FieldValue)> values)

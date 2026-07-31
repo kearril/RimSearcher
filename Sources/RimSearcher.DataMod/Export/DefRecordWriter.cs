@@ -3,6 +3,9 @@ using System.Data.SQLite;
 
 namespace RimSearcher.DataMod.Export;
 
+/// <summary>
+/// 预编译的 defs 表插入器：参数复用，避免每行重建命令与参数。
+/// </summary>
 internal sealed class DefRecordWriter : IDisposable
 {
     private readonly SQLiteCommand _command;
