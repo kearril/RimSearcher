@@ -73,7 +73,7 @@ Place `skills/rimsearcher/` into your runtime's skills directory. Refer to the
 Guide the user through the in-game steps:
 
 1. Open Options → Mod Settings → RimSearcherDataMod
-2. Click "Export Def Database"
+2. Click "Export Def database"
 3. Copy the generated `defs.db` to the same directory as `rimsearcher.exe`
 
 ### Step 7: Verify

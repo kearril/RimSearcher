@@ -96,7 +96,7 @@ rimsearcher install
 
 | 组件 | 说明                                                                                                                             |
 |---|----------------------------------------------------------------------------------------------------------------------------------|
-| **RimSearcher.DataMod** | 游戏内反射导出模组。运行时将当前加载的 Def 数据导出为 `defs.db`，label 和 description 为游戏当前语言的文本 |
+| **RimSearcher.DataMod** | 游戏内反射导出模组。运行时将当前加载的 Def 数据导出为 `defs.db`，label 和 description 为游戏当前语言的文本；游戏内 UI 支持英/简中/繁中 |
 | **rimsearcher CLI** | .NET 命令行工具。10 个命令：`search` `list` `get` `find` `fields` `values` `types` `mods` `install` `update`                     |
 | **rimsearcher Skill** | AI 助手技能文件。教 AI 使用 CLI + 反编译 MCP 定位和分析 RimWorld 源码，含反幻觉规则                                              |
 
