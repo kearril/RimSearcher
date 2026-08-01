@@ -28,12 +28,12 @@ internal static class FieldCommands
             }
         });
 
-        app.Add("fields", ([Argument] string defName, string type, int limit = 1000) =>
+        app.Add("fields", ([Argument] string defName, string type, int limit = 1000, string? filter = null) =>
         {
             if (TypeGuard.RejectUnknown(type, defRepository))
                 return;
 
-            var result = fieldRepository.GetFields(defName, type, limit);
+            var result = fieldRepository.GetFields(defName, type, limit, filter);
             output.Write(result.Values);
             if (result.IsTruncated)
                 Console.Error.WriteLine($"Hint: reached limit {limit}; results may be truncated, use --limit to increase");

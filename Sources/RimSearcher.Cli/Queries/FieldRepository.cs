@@ -47,7 +47,7 @@ internal sealed class FieldRepository
         return results;
     }
 
-    public FieldListResult GetFields(string defName, string type, int limit)
+    public FieldListResult GetFields(string defName, string type, int limit, string? filter)
     {
         using var connection = _connections.Open();
 
@@ -60,9 +60,15 @@ internal sealed class FieldRepository
                 FROM field_values fv
                 JOIN defs d ON fv.def_id = d.id
                 WHERE d.def_name = @name AND d.def_type = @type
+                  AND (@filter IS NULL OR fv.field_path LIKE @pattern ESCAPE '\')
                 """;
             command.Parameters.AddWithValue("@name", defName);
             command.Parameters.AddWithValue("@type", type);
+            // 空 glob 归一为 null：LIKE '' 匹配空串（等价于 0 命中），而"不传"应匹配全部。
+            filter = string.IsNullOrEmpty(filter) ? null : filter;
+            command.Parameters.AddWithValue("@filter", (object?)filter ?? DBNull.Value);
+            // SQL 引用的参数必须绑定（即使条件短路）：@pattern 恒绑，null 时条件不生效。
+            command.Parameters.AddWithValue("@pattern", (object?)(filter != null ? GlobToLike(filter) : null) ?? DBNull.Value);
 
             using var reader = command.ExecuteReader();
             while (reader.Read())
@@ -188,6 +194,13 @@ internal sealed class FieldRepository
     /// </summary>
     private static string EscapeLikePattern(string value) =>
         value.Replace("\\", "\\\\").Replace("%", "\\%").Replace("_", "\\_");
+
+    /// <summary>
+    /// glob（仅 * 通配，跨段匹配任意字符序列）转 LIKE 模式：字面转义复用
+    /// <see cref="EscapeLikePattern"/>（路径字段名常含下划线，必须精确），* 替换放最后。
+    /// </summary>
+    private static string GlobToLike(string glob) =>
+        EscapeLikePattern(glob).Replace("*", "%");
 
     private static bool IsNoiseField(string path)
     {

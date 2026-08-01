@@ -216,6 +216,7 @@ rimsearcher fields <defName> --type <T> [--limit N]
 | `defName` | required | Exact def_name |
 | `--type` | required | def_type |
 | `--limit` | 1000 | Max results (all rows fetched, then filtered/sorted/natural-ordered) |
+| `--filter` | null | Path glob filter: `*` matches any character run (crosses segments), everything else is literal — `ingestible.*` or `comps[0].*`; empty filter = no filter |
 
 **Output**: Array of `{field_path, field_value, def_type?}` — paths in **natural order** (numeric segments by value: `genSteps[2]` before `genSteps[10]`).
 `def_type` is an array of all matching `def_types` and appears only when the value is a reference (matches a `def_name` in the `defs` table); cross-type duplicate names are legal in RimWorld, so all hits are listed (e.g. `"def_type": ["GenStepDef", "ThingDef"]`).

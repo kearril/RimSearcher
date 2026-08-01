@@ -43,6 +43,7 @@ Not found → exit 2 plus a `Did you mean: …` list of similar def_names (same 
 A misspelled `--type` is rejected up front: `unknown def_type 'X'` on stderr, **exit 1** — run `types` to list valid types.
 `--brief` returns `{classes[]}` — every `*Class`-suffixed string field in the def (thingClass, compClass, workerClass, hediffClass, …), i.e. the C# bridge to the decompiler. Decompile the entries relevant to your question; if none fits, use `fields` and scan `field_path`/`field_value` pairs yourself.
 `--field <path>` extracts a single field (same path format as `fields`: `a.b[0].c`) instead of the full JSON — use it when only one value is needed (saves tokens and parsing); mutually exclusive with `--brief`.
+Large defs: `fields` accepts a `--filter` glob (`*` = any run of characters) to narrow to a path subtree, e.g. `comps[0].*` or `ingestible.*`.
 
 ### output format
 Data-query commands write JSON to stdout; errors and hints go to stderr.
