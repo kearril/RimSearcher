@@ -1,6 +1,6 @@
 # RimSearcher
 
-[![Skills Update Time](https://img.shields.io/endpoint?url=https%3A%2F%2Fkearril.github.io%2FRimSearcher%2Fskills-update.json&cacheSeconds=300)](https://github.com/kearril/RimSearcher/commits/master/skills)
+[![Skills Update Time](https://img.shields.io/endpoint?url=https%3A%2F%2Fkearril.github.io%2FRimSearcher%2Fskills-update.json&cacheSeconds=300)](https://github.com/kearril/RimSearcher/commits/master/skills.zip)
 
 [English](README.en.md) | 简体中文
 
@@ -112,7 +112,7 @@ dotnet publish Sources/RimSearcher.Cli/ -c Release -o Sources/RimSearcher.Cli/pu
 # DataMod 模组
 dotnet build Sources/RimSearcher.DataMod/ -c Release
 # 产物: RimSearcher_DataMod/Assemblies/RimSearcher.DataMod.dll（含依赖）
-#       RimSearcher_DataMod/Native/（全平台 SQLite 原生库，构建自动生成）
+#       RimSearcher_DataMod/Native/（SQLite 原生库，构建自动生成）
 ```
 
 ## 贡献 Skill
@@ -128,15 +128,15 @@ dotnet build Sources/RimSearcher.DataMod/ -c Release
 ### search — 全文搜索
 
 ```
-rimsearcher search <keyword> [--type T] [--mod M] [--limit N] [--count]
+rimsearcher search <keyword> [--type T] [--mod M] [--limit N] [--count] [--name-only]
 ```
 
-FTS5 全文索引覆盖 Def 名称、标签、描述和所有字段值。中英文混合查询，支持前缀通配和布尔组合。
+FTS5 全文索引覆盖 Def 名称、标签、描述和所有字段值。中英文混合查询，支持前缀通配和布尔组合。`--name-only` 限定 def_name 列匹配，消除描述噪音。
 
 ### list — 分页浏览
 
 ```
-rimsearcher list [--type T] [--mod M] [--limit N] [--offset N]
+rimsearcher list [--type T] [--mod M] [--limit N] [--offset N] [--total]
 ```
 
 按类型或所属 Mod 浏览 Def 列表，支持分页。无搜索开销，按 def_type、def_name 排序。
@@ -144,11 +144,11 @@ rimsearcher list [--type T] [--mod M] [--limit N] [--offset N]
 ### get — 精确定位
 
 ```
-rimsearcher get <defName> [--type T] [--brief]
+rimsearcher get <defName> [--type T] [--brief] [--field <路径>]
 ```
 
 按名称定位 Def。`--brief` 提取 Def 中全部 `*Class` 桥接字段值（`thingClass`、`compClass`、`workerClass`、`hediffClass` 等，类型无关），
-作为反编译 MCP 的搜索入口。多类型歧义时列出候选项。
+作为反编译 MCP 的搜索入口。`--field` 按路径（`a.b[0].c`）提取单个字段。多类型歧义时列出候选项；未命中时给出相似名候选与抽象 Def 说明。
 
 ### find — 反向查找
 
@@ -161,15 +161,15 @@ rimsearcher find <fieldPath> <value> [--type T] [--mod M] [--limit N]
 ### fields — 字段树
 
 ```
-rimsearcher fields <defName> --type <T> [--limit N]
+rimsearcher fields <defName> --type <T> [--limit N] [--filter <glob>]
 ```
 
-列出单个 Def 的完整字段树，直观查看嵌套结构。
+列出单个 Def 的完整字段树，直观查看嵌套结构。`--filter` 支持路径 glob 过滤（`*` 跨段匹配，如 `comps[0].*`）。
 
 ### values — 值枚举
 
 ```
-rimsearcher values <fieldPath> [--limit N]
+rimsearcher values <fieldPath> [--type T] [--limit N]
 ```
 
 枚举任意字段路径的去重值集合。

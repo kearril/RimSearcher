@@ -64,6 +64,7 @@ Remind the user not to move the exe file afterwards.
 
 Place `skills/rimsearcher/` into your runtime's skills directory. Refer to the
 [Agent Skills specification](https://agentskills.io/specification) if unsure.
+Restart the AI client to activate.
 
 ### Step 6: Guide Data Export
 
