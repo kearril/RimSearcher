@@ -74,6 +74,8 @@ rimsearcher search <keyword> [--type T] [--mod M] [--limit N] [--count]
 **Semantics**: FTS5 token matching, not SQL LIKE. The unicode61 tokenizer splits on word boundaries.
 `shield` matches the standalone token `shield` but not `ShieldBelt` (one token). Use `shield*` for prefix.
 
+**Indexed content**: `full_text` is built from defName, label, description, and key field values — including nested reference names. Tokenization splits on `_`, so `Apparel_ShieldBelt` contributes both `apparel` and `shieldbelt` tokens: `search ShieldBelt` therefore also hits defs that only *reference* the belt (PawnKinds with it in their default apparel, recipes producing it). Expect reference-related hits, not only literal-name matches.
+
 **CJK**: CJK runs are expanded into bigrams on the query side (space = AND); any length works as-is:
 `护盾` or `粉碎机械族` both hit defs containing the text. Single CJK chars (e.g. `闪`) never match — the index has no single-char tokens.
 
