@@ -76,12 +76,12 @@ internal static class ReleaseUpdater
         // 更新器副本：复制自身为独立文件再运行。
         // 副本进程锁的是副本文件，目标 rimsearcher.exe 不被任何进程持有，替换才可能成功；
         // 若直接以自身启动 --internal-replace，子进程会锁住目标导致覆盖必败。
-        // 不用 bat：UTF-8 脚本被 cmd 按 ANSI 代码页（中文系统 GBK）误读导致 move 静默失败（实测），
+        // 不用 bat：UTF-8 脚本被 cmd 按 ANSI 代码页（中文系统 GBK）误读导致 move 静默失败，
         // 且 bat 是 Windows-only，与多平台目标冲突。
         var updaterPath = Path.Combine(executableDirectory, "rimsearcher.updater.exe");
         try
         {
-            TryDelete(updaterPath); // 清理上次运行的残留副本（旧副本早已退出，可删）。
+            TryDelete(updaterPath); // 清理上次运行的残留副本。
             File.Copy(Environment.ProcessPath!, updaterPath, overwrite: true);
             Process.Start(new ProcessStartInfo(updaterPath,
                 $"\"--internal-replace\" \"{newExecutablePath}\" \"{Environment.ProcessPath}\" {Environment.ProcessId}")

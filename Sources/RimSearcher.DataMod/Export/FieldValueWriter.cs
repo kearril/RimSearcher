@@ -5,7 +5,7 @@ using System.Data.SQLite;
 namespace RimSearcher.DataMod.Export;
 
 /// <summary>
-/// field_values 批量写入：攒批后一次性插入并清空缓存列表。
+/// field_values 攒批写入：减少逐行插入的事务开销。
 /// </summary>
 internal static class FieldValueWriter
 {

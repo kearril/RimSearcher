@@ -47,8 +47,7 @@ internal static class CjkBigramExpander
         return result.ToString();
     }
 
-    // 注：CJK Extension B（U+20000 起）在 char 上不可达，代理对按两个 char 参与分段，
-    // 与原实现行为一致，故不在此处处理。
+    // 注：CJK Extension B（U+20000 起）在 char 上不可达，代理对按两个 char 参与分段，与 CLI 侧行为一致。
     private static bool IsCjkChar(char character) =>
         character is >= '\u4E00' and <= '\u9FFF'
             or >= '\u3400' and <= '\u4DBF';

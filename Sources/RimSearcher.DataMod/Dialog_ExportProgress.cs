@@ -5,9 +5,6 @@ using Verse;
 
 namespace RimSearcher.DataMod;
 
-/// <summary>
-/// 在后台线程生成数据库期间显示导出进度。
-/// </summary>
 public class Dialog_ExportProgress : Window
 {
     private const float ContentMargin = 20f;
@@ -101,7 +98,6 @@ public class Dialog_ExportProgress : Window
                 var elapsed = GetElapsed();
                 if (done)
                 {
-                    // 导出已结束：只显示实际导出用时，不再显示预计剩余。
                     Widgets.Label(new Rect(ContentMargin, y, width, 22f), $"已用: {FormatTime(elapsed)}");
                 }
                 else

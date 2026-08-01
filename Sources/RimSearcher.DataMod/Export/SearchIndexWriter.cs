@@ -4,9 +4,6 @@ using System.Data.SQLite;
 
 namespace RimSearcher.DataMod.Export;
 
-/// <summary>
-/// 预编译的 defs_fts 全文索引插入器。
-/// </summary>
 internal sealed class SearchIndexWriter : IDisposable
 {
     private readonly SQLiteCommand _command;

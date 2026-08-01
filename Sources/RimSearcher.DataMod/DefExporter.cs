@@ -101,7 +101,6 @@ public static class DefExporter
                         sourceFile,
                         json);
 
-                    // 构建 FTS 检索文本并写入全文索引
                     var fieldTexts = new List<string>();
                     bool fieldsCapped = DefFieldExtractor.Extract(def, defId, fieldValueInserts, fieldTexts);
                     if (fieldsCapped)
@@ -121,7 +120,6 @@ public static class DefExporter
                     }
                 }
 
-                // 每个类型处理完成后刷新一次进度。
                 progress?.Invoke(totalDefs, estimatedTotal, $"{typeName}: {totalDefs} / {estimatedTotal}");
             }
         }

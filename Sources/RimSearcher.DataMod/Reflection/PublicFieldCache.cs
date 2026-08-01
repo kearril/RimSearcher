@@ -52,7 +52,7 @@ internal static class PublicFieldCache
             return true;
 
         // 委托字段是运行时函数指针（XML 无法加载），序列化其内部会产生
-        // method_ptr/m_value 深链垃圾（实测 ThinkTreeDef.wanderDestValidator 288 节点）。
+        // method_ptr/m_value 深链垃圾（ThinkTreeDef.wanderDestValidator 288 节点）。
         if (typeof(Delegate).IsAssignableFrom(field.FieldType))
             return true;
 

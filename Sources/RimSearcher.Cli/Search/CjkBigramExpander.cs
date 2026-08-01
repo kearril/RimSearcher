@@ -3,11 +3,9 @@ using System.Text;
 namespace RimSearcher.Cli.Search;
 
 /// <summary>
-/// 查询侧 CJK 大词展开：与 DataMod 写侧 CjkBigramExpander（SearchTextBuilder 调用）共享字符判定，
-/// 但语义为"替换"——把连续 CJK 段替换为其相邻二元组，写侧为"追加"（保留原文）。
-/// MATCH 表达式中空格是 AND 语义：若保留原始整段 token（写侧索引里不存在该 token），
-/// 整条查询会因该 AND 项落空而返回 0 结果。
-/// 两侧字符判定与展开规则修改时必须同步。
+/// 查询侧 CJK 大词展开：连续 CJK 段替换为相邻二元组（与 DataMod 写侧共享字符判定，
+/// 写侧为“追加”、查询侧为“替换”——MATCH 空格是 AND，保留原文 token 会使查询落空）。
+/// 两侧规则修改时必须同步。
 /// </summary>
 internal static class CjkBigramExpander
 {
@@ -47,7 +45,7 @@ internal static class CjkBigramExpander
                 }
                 else
                 {
-                    // 单字 CJK：原样保留（索引侧无单字 token，命中 0 为 D26 已知限制）。
+                    // 单字 CJK：索引侧无单字 token，恒 0 命中，原样保留。
                     result.Append(text, runStart, runLength).Append(' ');
                 }
 
