@@ -43,9 +43,9 @@ internal sealed class CliExceptionFilter(ConsoleAppFilter next) : ConsoleAppFilt
         switch (exception.SqliteErrorCode)
         {
             // 查询 SQL 均为固定模板，唯一接受用户输入的是 FTS MATCH 表达式，
-            // 因此执行期的 SQLITE_ERROR 基本来自 FTS 语法。按错误码分类，
+            // 因此执行期的 SQLITE_ERROR 均视为 FTS 语法错误——按错误码分类，
             // 不依赖随 SQLite 版本变动的消息文案。
-            case SqliteError when IsFtsSyntaxError(exception.Message):
+            case SqliteError:
                 Console.Error.WriteLine($"FTS query syntax error: {exception.Message}");
                 Console.Error.WriteLine(
                     "Hint: use 'rimsearcher find <field> <value>' or 'rimsearcher values <field>' for exact matches");
@@ -60,8 +60,4 @@ internal sealed class CliExceptionFilter(ConsoleAppFilter next) : ConsoleAppFilt
 
         Environment.ExitCode = ExitCodes.Error;
     }
-
-    private static bool IsFtsSyntaxError(string message) =>
-        message.Contains("fts5", StringComparison.OrdinalIgnoreCase)
-        || message.Contains("syntax error", StringComparison.OrdinalIgnoreCase);
 }

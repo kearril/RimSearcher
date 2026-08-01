@@ -70,9 +70,11 @@ internal static class JsonFieldNavigator
                 if (end < 0)
                     return null;
                 var indexText = path[(i + 1)..end];
-                if (indexText.Length == 0 || !IsAllDigits(indexText))
+                // IsAllDigits 先于 TryParse：拒绝负号等非数字写法；
+                // TryParse 兜底超长数字溢出（溢出归入 MalformedPath 而非 Int32 异常）。
+                if (indexText.Length == 0 || !IsAllDigits(indexText) || !int.TryParse(indexText, out var index))
                     return null;
-                segments.Add(new Segment(null, int.Parse(indexText)));
+                segments.Add(new Segment(null, index));
                 i = end + 1;
                 continue;
             }

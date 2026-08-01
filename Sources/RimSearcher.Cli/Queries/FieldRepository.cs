@@ -114,6 +114,9 @@ internal sealed class FieldRepository
 
     public IReadOnlyList<string> GetValues(string fieldPath, string? type, int limit)
     {
+        if (fieldPath.Length == 0)
+            throw new ArgumentException("field path must not be empty");
+
         using var connection = _connections.Open();
         using var command = connection.CreateCommand();
         // 后缀匹配转为反转前缀范围查询：走 idx_fv_path_rev 索引；
