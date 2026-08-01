@@ -270,6 +270,19 @@ No parameters.
 
 Dynamic/abstract Defs appear as `mod_name: "Unknown"` with `package_id: null`.
 
+---
+
+## Known Limitations
+
+Tool-behavior quirks that look like failures but are by design. If a result seems wrong, check this list first.
+
+- **FTS tokenizes whole words**: `search shield` matches only the exact token `shield`, never `ShieldBelt` — add a prefix wildcard (`shield*`); 0 hits with a Latin keyword and no `*` prints a stderr hint. Single CJK chars (`闪`) never match (no single-char tokens in the index).
+- **`fields` `def_type` is a value-match hint**: a value equal to some `def_name` is annotated with all matching `def_types` — generic words that happen to share a def_name (`None`, `Normal`) may be annotated too; it is a hint, not proof. Confirm with `get` when the field semantics are unclear.
+- **`fields` order is natural, not lexicographic**: numeric path segments compare by value (`genSteps[2]` before `genSteps[10]`).
+- **`find`/`values` `fieldPath` is a literal suffix**: `%`/`_` are escaped, not wildcards; `find` values are exact (`=`), case-sensitive, canonically formatted (bools lowercase).
+- **`--brief` empty `classes[]` is a legal result**: the def has no `*Class` string fields (stderr prints a hint); use `fields` instead.
+
+---
 
 ## See Also
 

@@ -28,6 +28,7 @@ These are the CLI behaviors that guessing wrong wastes turns.
 ### search — use a prefix wildcard for Latin terms
 FTS5 token matching, **not** SQL LIKE. `shield` matches only the standalone token `shield` — it will not match `ShieldBelt` (one token). For Latin/alphanumeric prefix searches, add `*`: `shield*`.
 CJK is auto-bigram (query-side expansion): `护盾` matches `护盾腰带`, and multi-char phrases work as-is too (`粉碎机械族`). Single CJK chars (`闪`) cannot match — the index has no single-char tokens.
+0 hits with a Latin keyword and no `*` prints a stderr hint explaining the prefix-wildcard mechanism (e.g. `shield` → hint suggests `shield*`).
 
 ### find — value is exact match
 `find <path> <value>` uses `=` equality. `find compClass Shield` matches nothing; you need the full name: `find compClass RimWorld.CompShield`. For partial names, use `search`.
@@ -53,7 +54,7 @@ User knows the defName or wants to browse/enumerate. No search needed.
 User wants to understand a game mechanic end-to-end.
 
 1. `search "<query>" --type T`          ← Latin/alphanumeric prefix: append `*`; CJK: use as-is
-   If several Defs match, continue only when `def_type`, `label`, and `mod_name` identify the intended Def; otherwise present concise candidates and ask which Def to inspect.
+   If several Defs match, disambiguate automatically first: a mechanic search usually has one canonical def_type (map generation → GenStepDef/MapGeneratorDef, apparel stats → StatDef, …). When `def_type` + `label` + `mod_name` single out the intended Def, continue without asking; only present candidates and ask when they genuinely conflict.
 2. `get <name> --type T --brief`          ← extracts `classes[]` (all `*Class` bridge fields)
    Decompile the entries relevant to the question.
    If none yields the behavior, use `fields <name> --type <T>` and inspect every `field_path` / `field_value` pair for fully-qualified C# type names — paths ending in `Class` are common clues (workerClass, hediffClass, driverClass, …), not an exhaustive list.
@@ -89,6 +90,9 @@ Read `references/cli-reference.md` only when command parameters, output fields, 
 Read `references/decompiler-mcp.md` only for context loading, recovery, inheritance/call-graph analysis, IL/transpiler work, or version comparison.
 
 ## Guardrails
+
+**Grounding first** — decompiler results are only as good as the memberId that produced them:
+- A guessed or stale `memberId` can silently resolve to an *unrelated* member (no error is raised). Before reading further, confirm the returned `fullName`/signature matches the target; if not, re-resolve.
 
 **NEVER:**
 - Guess field names — run `get --brief` or `fields` first.
