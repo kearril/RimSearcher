@@ -16,13 +16,20 @@ internal static class SearchCommands
                 var countResult = repository.CountSearchResults(keyword, type, mod);
                 output.Write(new { count = countResult });
                 if (countResult == 0)
+                {
                     MaybePrefixWildcardHint(keyword);
+                    Environment.ExitCode = ExitCodes.NotFound;
+                }
                 return;
             }
             var results = repository.Search(keyword, type, mod, limit);
             output.Write(results);
             if (results.Count == 0)
+            {
                 MaybePrefixWildcardHint(keyword);
+                // 无结果非零退出（stdout 仍输出 []）：与 find/get 的 NotFound 契约统一。
+                Environment.ExitCode = ExitCodes.NotFound;
+            }
         });
 
         app.Add("list", (string? type = null, string? mod = null, int limit = 20, int offset = 0) =>

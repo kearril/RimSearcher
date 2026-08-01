@@ -27,11 +27,18 @@ internal static class FieldCommands
             output.Write(result.Values);
             if (result.IsTruncated)
                 Console.Error.WriteLine($"Hint: reached limit {limit}; results may be truncated, use --limit to increase");
+            // 无结果非零退出（stdout 仍输出 []）：与 find/get 的 NotFound 契约统一。
+            if (result.Values.Count == 0)
+                Environment.ExitCode = ExitCodes.NotFound;
         });
 
         app.Add("values", ([Argument] string fieldPath, int limit = 200) =>
         {
-            output.Write(repository.GetValues(fieldPath, limit));
+            var values = repository.GetValues(fieldPath, limit);
+            output.Write(values);
+            // 无结果非零退出（stdout 仍输出 []）：与 find/get 的 NotFound 契约统一。
+            if (values.Count == 0)
+                Environment.ExitCode = ExitCodes.NotFound;
         });
     }
 }

@@ -39,11 +39,11 @@ Export content reflects runtime state; the following limits are by design:
 
 | Code | Meaning |
 |---|---|
-| 0 | Success (including empty result sets of enumerating commands such as `values`/`fields`) |
-| 1 | Runtime or query failure (message on stderr) |
-| 2 | Query found nothing or was ambiguous: `get` not-found / multi-type without `--type`; `find` 0 hits (stdout stays `[]`) |
+| 0 | Success |
+| 1 | Runtime or query failure (message on stderr); **unknown command** (usage on stderr) |
+| 2 | Query found nothing or was ambiguous: `get` not-found / multi-type without `--type`; `find`/`search`/`fields`/`values` 0 hits (stdout stays `[]` or `{"count": 0}`) |
 
-Unknown commands print usage and exit 0 (retained behavior). Data always goes to stdout, diagnostics to stderr.
+Data always goes to stdout, diagnostics to stderr.
 
 ---
 
@@ -72,6 +72,8 @@ rimsearcher search <keyword> [--type T] [--mod M] [--limit N] [--count]
 
 **CJK**: CJK runs are expanded into bigrams on the query side (space = AND); any length works as-is:
 `护盾` or `粉碎机械族` both hit defs containing the text. Single CJK chars (e.g. `闪`) never match — the index has no single-char tokens.
+
+**0 hits**: stdout stays `[]` (or `{"count": 0}`) and the process exits with code 2; a Latin keyword without `*` also prints a prefix-wildcard hint on stderr.
 
 **FTS syntax errors**: queries with digits or special characters (e.g. `0.1`) trigger an FTS5 syntax error; stderr hints at `find`/`values` for exact matching.
 
@@ -198,6 +200,7 @@ rimsearcher fields <defName> --type <T> [--limit N]
 **Output**: Array of `{field_path, field_value, def_type?}` — paths in **natural order** (numeric segments by value: `genSteps[2]` before `genSteps[10]`).
 `def_type` is an array of all matching `def_types` and appears only when the value is a reference (matches a `def_name` in the `defs` table); cross-type duplicate names are legal in RimWorld, so all hits are listed (e.g. `"def_type": ["GenStepDef", "ThingDef"]`).
 Note: annotation is by value match only — generic words that happen to share a `def_name` (`None`, `Normal`, …) may be annotated too; treat `def_type` as a hint and confirm with `get` when the field's semantics are unclear.
+**0 hits**: stdout stays `[]` and the process exits with code 2.
 
 **Noise filtering**: The following are excluded:
 - Fields matching: `debugRandomId`, `defNameHash`, `generated`, `ignoreConfigErrors`, `ignoreIllegalLabelCharacterConfigError`, `index`, `shortHash`
@@ -227,6 +230,8 @@ rimsearcher values <fieldPath> [--limit N]
 | `--limit` | 200 | Max distinct values |
 
 **Output**: String array of distinct field values.
+
+**0 hits**: stdout stays `[]` and the process exits with code 2.
 
 **Examples**:
 ```bash
