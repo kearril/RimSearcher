@@ -83,7 +83,7 @@ Restart and start testing and using the tool.
 
 | Component | Description |
 |---|---|
-| **RimSearcher.DataMod** | In-game reflection export mod. Exports the currently loaded Def data to `defs.db` at runtime; labels and descriptions use the game's current language. The in-game UI supports English, Simplified Chinese and Traditional Chinese; theoretically supports Windows, macOS and Linux (macOS and Linux not yet tested) |
+| **RimSearcher.DataMod** | In-game reflection export mod. Exports the currently loaded Def data to `defs.db` at runtime; labels and descriptions use the game's current language. The in-game UI supports English, Simplified Chinese and Traditional Chinese; Windows only |
 | **rimsearcher CLI** | .NET command-line tool. 10 commands: `search` `list` `get` `find` `fields` `values` `types` `mods` `install` `update` |
 | **rimsearcher Skill** | AI assistant skill files. Teach the AI to locate and analyze RimWorld source code using the CLI + decompilation MCP, with anti-hallucination rules |
 
