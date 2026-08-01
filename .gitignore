@@ -1,37 +1,30 @@
-# .gitignore for RimSearcher
 
-# Build artifacts
 .build/
 Publish/
 bin/
 obj/
 
-# 构建产物二进制（发布时从工作区构建产物打包）
 /RimSearcher_DataMod/Assemblies/
 /RimSearcher_DataMod/Native/
 
-# IDE settings
 .idea/
 .vs/
 *.user
 *.userosscache
 *.sln.docstates
 
-# NuGet
 packages/
 *.nuget.props
 *.nuget.targets
 
-# OS generated files
 .DS_Store
 Thumbs.db
 
-# MCP project specific logs or temp files
 *.log
 /config.json
 /.omp/
 /ARCHITECTURE.md
 /docs/
 
-# 发布资产暂存目录（不入库）
 .release/
+/AGENTS.md
