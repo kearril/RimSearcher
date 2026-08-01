@@ -32,9 +32,13 @@ internal static class SearchCommands
             }
         });
 
-        app.Add("list", (string? type = null, string? mod = null, int limit = 20, int offset = 0) =>
+        app.Add("list", (string? type = null, string? mod = null, int limit = 20, int offset = 0, bool total = false) =>
         {
-            output.Write(repository.List(type, mod, limit, offset));
+            var results = repository.List(type, mod, limit, offset);
+            if (total)
+                output.Write(new { total = repository.CountListed(type, mod), results });
+            else
+                output.Write(results);
         });
     }
 

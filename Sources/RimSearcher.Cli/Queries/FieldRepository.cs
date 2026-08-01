@@ -112,18 +112,21 @@ internal sealed class FieldRepository
         }
     }
 
-    public IReadOnlyList<string> GetValues(string fieldPath, int limit)
+    public IReadOnlyList<string> GetValues(string fieldPath, string? type, int limit)
     {
         using var connection = _connections.Open();
         using var command = connection.CreateCommand();
         command.CommandText = """
             SELECT DISTINCT fv.field_value
             FROM field_values fv
+            JOIN defs d ON fv.def_id = d.id
             WHERE fv.field_path LIKE '%' || @path ESCAPE '\'
+              AND (@type IS NULL OR d.def_type = @type)
             ORDER BY fv.field_value
             LIMIT @limit
             """;
         command.Parameters.AddWithValue("@path", EscapeLikePattern(fieldPath));
+        QueryParameters.AddFilters(command, type, null);
         command.Parameters.AddWithValue("@limit", limit);
 
         var values = new List<string>();

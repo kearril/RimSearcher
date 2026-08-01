@@ -32,9 +32,9 @@ internal static class FieldCommands
                 Environment.ExitCode = ExitCodes.NotFound;
         });
 
-        app.Add("values", ([Argument] string fieldPath, int limit = 200) =>
+        app.Add("values", ([Argument] string fieldPath, string? type = null, int limit = 200) =>
         {
-            var values = repository.GetValues(fieldPath, limit);
+            var values = repository.GetValues(fieldPath, type, limit);
             output.Write(values);
             // 无结果非零退出（stdout 仍输出 []）：与 find/get 的 NotFound 契约统一。
             if (values.Count == 0)

@@ -41,7 +41,9 @@ Export content reflects runtime state; the following limits are by design:
 |---|---|
 | 0 | Success |
 | 1 | Runtime or query failure (message on stderr); **unknown command** (usage on stderr) |
-| 2 | Query found nothing or was ambiguous: `get` not-found / multi-type without `--type`; `find`/`search`/`fields`/`values` 0 hits (stdout stays `[]` or `{"count": 0}`) |
+| 2 | Query found nothing or was ambiguous: `get` not-found / multi-type without `--type` / `--field` not found; `find`/`search`/`fields`/`values` 0 hits (stdout stays `[]` or `{"count": 0}`) |
+
+Exception: `list` keeps exit 0 on an empty page (pagination semantics — an out-of-range offset is a normal state, not a miss).
 
 Data always goes to stdout, diagnostics to stderr.
 
@@ -91,7 +93,7 @@ rimsearcher search "shield OR barrier" --limit 5
 Browse Defs with pagination, no search overhead.
 
 ```
-rimsearcher list [--type T] [--mod M] [--limit N] [--offset N]
+rimsearcher list [--type T] [--mod M] [--limit N] [--offset N] [--total]
 ```
 
 | Parameter | Default | Description |
@@ -100,13 +102,18 @@ rimsearcher list [--type T] [--mod M] [--limit N] [--offset N]
 | `--mod` | null | Filter by mod_name |
 | `--limit` | 20 | Page size |
 | `--offset` | 0 | Skip first N rows |
+| `--total` | false | Also return the filtered total (ignoring limit/offset) |
 
 **Output**: Array of `{def_name, def_type, label, mod_name, package_id}`, sorted by `def_type, def_name`.
+
+**Output** (--total): `{"total": N, "results": [...]}` — total is the filtered count regardless of `--limit`/`--offset`, for pagination math.
+
+**Empty page**: exit 0 (pagination semantics — an out-of-range offset is normal, not a miss).
 
 **Examples**:
 ```bash
 rimsearcher list --type ThingDef --offset 40
-rimsearcher list --mod Core --limit 10
+rimsearcher list --mod Core --limit 10 --total
 ```
 
 ---
@@ -116,7 +123,7 @@ rimsearcher list --mod Core --limit 10
 Retrieve a single Def by exact def_name match.
 
 ```
-rimsearcher get <defName> [--type T] [--brief]
+rimsearcher get <defName> [--type T] [--brief] [--field <path>]
 ```
 
 | Parameter | Default | Description |
@@ -124,10 +131,15 @@ rimsearcher get <defName> [--type T] [--brief]
 | `defName` | required | Exact def_name match |
 | `--type` | null | Required when defName matches multiple def_types |
 | `--brief` | false | Return only `classes[]` (all `*Class` bridge fields) instead of full JSON |
+| `--field` | null | Extract a single field by path (`a.b[0].c`, same format as `fields`) instead of full JSON; mutually exclusive with `--brief` |
 
 **Output** (default): Full `full_data` JSON object — the complete Def serialization.
 
 **Output** (--brief): `{def_name, def_type, label, mod_name, package_id, classes[]}` — every string field whose name ends in `Class` (thingClass, compClass, workerClass, hediffClass, …), the def's C# bridge clues for feeding the decompiler. Type-agnostic and recursion-deep; entries are deduplicated and sorted. When no `*Class` fields exist, stderr prints `Hint: no *Class fields found; try 'fields <defName> --type <T>'` and `classes[]` stays empty.
+
+**Output** (--field): the extracted JSON element as-is (string values include quotes, objects/arrays are raw JSON).
+
+**Errors** (--field): malformed path (bad format, e.g. `a[`) → exit 1; valid path with no match (missing property / out-of-range index) → exit 2.
 
 **Multi-type behavior**: If `defName` matches multiple types and `--type` is not specified, the command
 exits with code 2 and prints candidate types to stderr:
@@ -227,6 +239,7 @@ rimsearcher values <fieldPath> [--limit N]
 | Parameter | Default | Description |
 |---|---|---|
 | `fieldPath` | required | Suffix-matched: `LIKE '%fieldPath'` |
+| `--type` | null | Filter by def_type |
 | `--limit` | 200 | Max distinct values |
 
 **Output**: String array of distinct field values.

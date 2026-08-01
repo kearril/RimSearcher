@@ -66,11 +66,10 @@ internal sealed class DefRepository
     {
         using var connection = _connections.Open();
         using var command = connection.CreateCommand();
-        command.CommandText = """
+        command.CommandText = $"""
             SELECT d.def_name, d.def_type, d.label, d.mod_name, d.package_id
             FROM defs d
-            WHERE (@type IS NULL OR d.def_type = @type)
-              AND (@mod IS NULL OR d.mod_name = @mod)
+            {BuildListFilterSql()}
             ORDER BY d.def_type, d.def_name
             LIMIT @limit OFFSET @offset
             """;
@@ -88,6 +87,26 @@ internal sealed class DefRepository
         }
         return results;
     }
+
+    /// <summary>
+    /// list 的过滤后总数（无视 limit/offset），供 --total 分页使用；
+    /// 与 <see cref="List"/> 共享过滤条件，防 filter 漂移。
+    /// </summary>
+    public long CountListed(string? type, string? mod)
+    {
+        using var connection = _connections.Open();
+        using var command = connection.CreateCommand();
+        command.CommandText = $"""
+            SELECT COUNT(*)
+            FROM defs d
+            {BuildListFilterSql()}
+            """;
+        QueryParameters.AddFilters(command, type, mod);
+        return (long)command.ExecuteScalar()!;
+    }
+
+    private static string BuildListFilterSql() =>
+        "WHERE (@type IS NULL OR d.def_type = @type) AND (@mod IS NULL OR d.mod_name = @mod)";
 
     public IReadOnlyList<string> FindTypes(string defName)
     {

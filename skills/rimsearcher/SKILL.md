@@ -12,7 +12,7 @@ The DecompilerServer MCP reads C# source. Never guess an API — look it up.
 
 ```
 search "keyword"          ← partial / fuzzy match
-get <name> --type <T>     ← exact defName  (!) multi-type -> must add --type
+get <name> --type <T> [--field <path>]  ← exact defName  (!) multi-type -> must add --type
 find <path> <fullValue>   ← C# class → all Defs using it (empty → exit 2)
 list --type T --limit N --offset N  ← browsing / paginating
 fields <name> --type <T>  ← inspect one Def's field tree
@@ -38,6 +38,7 @@ Values are case-sensitive and formatted canonically: booleans are lowercase — 
 ### get — multi-type and `--brief`
 A defName can exist in multiple def_types (e.g. `Human` is in BodyDef, ThingDef, HediffGiverSetDef). Without `--type`, the command exits with code 2 and prints candidates — this is NOT a crash, just add `--type` and retry.
 `--brief` returns `{classes[]}` — every `*Class`-suffixed string field in the def (thingClass, compClass, workerClass, hediffClass, …), i.e. the C# bridge to the decompiler. Decompile the entries relevant to your question; if none fits, use `fields` and scan `field_path`/`field_value` pairs yourself.
+`--field <path>` extracts a single field (same path format as `fields`: `a.b[0].c`) instead of the full JSON — use it when only one value is needed (saves tokens and parsing); mutually exclusive with `--brief`.
 
 ### output format
 Data-query commands write JSON to stdout; errors and hints go to stderr.

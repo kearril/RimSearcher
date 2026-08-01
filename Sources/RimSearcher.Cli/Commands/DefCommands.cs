@@ -12,8 +12,15 @@ internal static class DefCommands
 {
     public static void Register(ConsoleApp.ConsoleAppBuilder app, DefRepository repository, JsonOutput output)
     {
-        app.Add("get", ([Argument] string defName, string? type = null, bool brief = false) =>
+        app.Add("get", ([Argument] string defName, string? type = null, bool brief = false, string? field = null) =>
         {
+            // 参数互斥：--brief 与 --field 都是提取视图，同时给出为参数错误。
+            if (brief && field != null)
+            {
+                Console.Error.WriteLine("Error: --brief and --field are mutually exclusive");
+                Environment.Exit(ExitCodes.Error);
+            }
+
             if (type == null)
             {
                 var types = repository.FindTypes(defName);
@@ -58,6 +65,31 @@ internal static class DefCommands
                     source.DefName, source.DefType, source.Label, source.ModName,
                     source.PackageId,
                     distinctClasses));
+                return;
+            }
+
+            if (field != null)
+            {
+                var source = repository.GetBriefSource(defName, type!);
+                if (source == null)
+                {
+                    Console.Error.WriteLine($"Error: no Def found with defName '{defName}' and type '{type}'");
+                    Environment.Exit(ExitCodes.NotFound);
+                }
+
+                using var document = JsonDocument.Parse(source.FullData);
+                var status = JsonFieldNavigator.TryNavigate(document.RootElement, field, out var value);
+                if (status == JsonFieldNavigator.NavigateStatus.MalformedPath)
+                {
+                    Console.Error.WriteLine($"Error: malformed field path '{field}' (expected format: a.b[0].c)");
+                    Environment.Exit(ExitCodes.Error);
+                }
+                if (status == JsonFieldNavigator.NavigateStatus.NotFound)
+                {
+                    Console.Error.WriteLine($"Error: field '{field}' not found in '{defName}' (type '{type}')");
+                    Environment.Exit(ExitCodes.NotFound);
+                }
+                Console.WriteLine(value.GetRawText());
                 return;
             }
 
