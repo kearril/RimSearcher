@@ -12,7 +12,9 @@ internal static class ExportDatabase
 {
     public static SqliteConnection Open(string databasePath)
     {
-        var connection = new SqliteConnection($"Data Source={databasePath}");
+        // Pooling=False：连接关闭即释放文件句柄。
+        // 默认连接池会让句柄残留至池回收，导致下次导出删除文件失败（"another process"）。
+        var connection = new SqliteConnection($"Data Source={databasePath};Pooling=False");
         try
         {
             connection.Open();

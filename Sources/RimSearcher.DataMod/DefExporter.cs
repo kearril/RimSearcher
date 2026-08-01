@@ -118,13 +118,17 @@ public static class DefExporter
                     {
                         Log($"Processed {totalDefs} Defs...");
                     }
-                }
 
-                progress?.Invoke(totalDefs, estimatedTotal);
+                    // 每个 Def 处理完更新一次进度：进度条按 Def 数平滑推进。
+                    progress?.Invoke(totalDefs, estimatedTotal);
+                }
             }
         }
 
         FieldValueWriter.Flush(conn, fieldValueInserts);
+
+        // 数据全部写入后统一构建索引（先插后建）。
+        ExportSchema.CreateIndexes(conn);
 
         tx.Commit();
         Log($"Wrote {totalDefs} Defs");

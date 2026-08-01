@@ -246,6 +246,8 @@ rimsearcher values <fieldPath> [--limit N]
 
 **0 hits**: stdout stays `[]` and the process exits with code 2.
 
+**Performance**: suffix matching runs on the reversed-path index (`field_path_rev`) — ~10 ms on a fresh export; matching is **case-sensitive exact suffix** (`statOffsets[0].value` does not match `equippedStatOffsets[0].value`).
+
 **Examples**:
 ```bash
 rimsearcher values compClass --limit 10

@@ -5,6 +5,7 @@
   <RimSearcher.ExportDefDatabase>Export Def database</RimSearcher.ExportDefDatabase>
   <RimSearcher.DialogTitle>Export Def database</RimSearcher.DialogTitle>
   <RimSearcher.ExportingWarning>Exporting, do not close this window...</RimSearcher.ExportingWarning>
+  <RimSearcher.BuildingIndex>Building index, do not close this window...</RimSearcher.BuildingIndex>
   <RimSearcher.Close>Close</RimSearcher.Close>
   <RimSearcher.ExportDone>Export complete!</RimSearcher.ExportDone>
   <RimSearcher.ExportFailed>Export failed</RimSearcher.ExportFailed>

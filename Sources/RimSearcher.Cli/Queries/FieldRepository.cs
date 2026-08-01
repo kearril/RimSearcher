@@ -116,16 +116,21 @@ internal sealed class FieldRepository
     {
         using var connection = _connections.Open();
         using var command = connection.CreateCommand();
+        // 后缀匹配转为反转前缀范围查询：走 idx_fv_path_rev 索引；
+        // BINARY 比较大小写敏感，与文档声明一致。
+        // field_path_rev 列由 DataMod 导出（捆绑发布必含）。
+        var reversed = ReversePath(fieldPath);
         command.CommandText = """
             SELECT DISTINCT fv.field_value
             FROM field_values fv
             JOIN defs d ON fv.def_id = d.id
-            WHERE fv.field_path LIKE '%' || @path ESCAPE '\'
+            WHERE fv.field_path_rev >= @low AND fv.field_path_rev < @high
               AND (@type IS NULL OR d.def_type = @type)
             ORDER BY fv.field_value
             LIMIT @limit
             """;
-        command.Parameters.AddWithValue("@path", EscapeLikePattern(fieldPath));
+        command.Parameters.AddWithValue("@low", reversed);
+        command.Parameters.AddWithValue("@high", NextBoundary(reversed));
         QueryParameters.AddFilters(command, type, null);
         command.Parameters.AddWithValue("@limit", limit);
 
@@ -134,6 +139,28 @@ internal sealed class FieldRepository
         while (reader.Read())
             values.Add(reader.GetString(0));
         return values;
+    }
+
+    /// <summary>
+    /// 反转路径（字符级）；与 DataMod 的 FieldValueWriter.ReversePath 算法一致，修改时必须同步两侧。
+    /// 路径字符集为 ASCII（C# 标识符 + [ ] . 数字），无代理对问题。
+    /// </summary>
+    private static string ReversePath(string path)
+    {
+        var chars = path.ToCharArray();
+        Array.Reverse(chars);
+        return new string(chars);
+    }
+
+    /// <summary>
+    /// 前缀范围上界：末字符 +1（BINARY 字符串比较，[low, high) 恰含全部以 low 为前缀的值）。
+    /// 路径末字符为 ASCII，无 \uFFFF 溢出。
+    /// </summary>
+    private static string NextBoundary(string prefix)
+    {
+        var chars = prefix.ToCharArray();
+        chars[^1]++;
+        return new string(chars);
     }
 
     /// <summary>

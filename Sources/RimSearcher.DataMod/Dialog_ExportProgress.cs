@@ -130,7 +130,14 @@ public class Dialog_ExportProgress : Window
         }
         else
         {
-            Widgets.Label(new Rect(ContentMargin, y, width, 28f), "RimSearcher.ExportingWarning".Translate());
+            // 进度满但线程未结束 = 索引构建/提交阶段，柔和蓝提示区别于导出中。
+            bool finishing = _total > 0 && _current >= _total;
+            var originalColor = GUI.color;
+            if (finishing)
+                GUI.color = ColorLibrary.BabyBlue;
+            Widgets.Label(new Rect(ContentMargin, y, width, 28f),
+                (finishing ? "RimSearcher.BuildingIndex" : "RimSearcher.ExportingWarning").Translate());
+            GUI.color = originalColor;
         }
     }
 

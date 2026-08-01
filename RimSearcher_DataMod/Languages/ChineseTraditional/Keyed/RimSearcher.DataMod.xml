@@ -5,6 +5,7 @@
   <RimSearcher.ExportDefDatabase>匯出 Def 資料庫</RimSearcher.ExportDefDatabase>
   <RimSearcher.DialogTitle>匯出 Def 資料庫</RimSearcher.DialogTitle>
   <RimSearcher.ExportingWarning>正在匯出，請勿關閉此視窗...</RimSearcher.ExportingWarning>
+  <RimSearcher.BuildingIndex>正在建立索引，請勿關閉此視窗...</RimSearcher.BuildingIndex>
   <RimSearcher.Close>關閉</RimSearcher.Close>
   <RimSearcher.ExportDone>匯出完成!</RimSearcher.ExportDone>
   <RimSearcher.ExportFailed>匯出失敗</RimSearcher.ExportFailed>

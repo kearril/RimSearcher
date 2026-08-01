@@ -4,6 +4,9 @@ namespace RimSearcher.DataMod.Export;
 
 internal static class ExportSchema
 {
+    /// <summary>
+    /// 建表（不含索引）：索引由 <see cref="CreateIndexes"/> 在数据全部写入后统一构建（先插后建）。
+    /// </summary>
     public static void Create(SqliteConnection connection)
     {
         using var command = connection.CreateCommand();
@@ -23,19 +26,12 @@ internal static class ExportSchema
                 full_data   TEXT NOT NULL
             );
 
-            CREATE UNIQUE INDEX idx_defs_name_type ON defs(def_name, def_type);
-            CREATE INDEX idx_defs_type ON defs(def_type);
-            CREATE INDEX idx_defs_mod ON defs(mod_name);
-
             CREATE TABLE field_values (
-                def_id      INTEGER NOT NULL REFERENCES defs(id),
-                field_path  TEXT NOT NULL,
-                field_value TEXT NOT NULL
+                def_id          INTEGER NOT NULL REFERENCES defs(id),
+                field_path      TEXT NOT NULL,
+                field_path_rev  TEXT NOT NULL,
+                field_value     TEXT NOT NULL
             );
-
-            CREATE INDEX idx_fv_def_id ON field_values(def_id);
-            CREATE INDEX idx_fv_path ON field_values(field_path);
-            CREATE INDEX idx_fv_value ON field_values(field_value);
 
             CREATE VIRTUAL TABLE defs_fts USING fts5(
                 def_name,
@@ -44,6 +40,25 @@ internal static class ExportSchema
                 full_text,
                 tokenize='unicode61'
             );
+        ";
+        command.ExecuteNonQuery();
+    }
+
+    /// <summary>
+    /// 统一构建全部索引：必须在数据写入完成后调用。
+    /// </summary>
+    public static void CreateIndexes(SqliteConnection connection)
+    {
+        using var command = connection.CreateCommand();
+        command.CommandText = @"
+            CREATE UNIQUE INDEX idx_defs_name_type ON defs(def_name, def_type);
+            CREATE INDEX idx_defs_type ON defs(def_type);
+            CREATE INDEX idx_defs_mod ON defs(mod_name);
+
+            CREATE INDEX idx_fv_def_id ON field_values(def_id);
+            CREATE INDEX idx_fv_path ON field_values(field_path);
+            CREATE INDEX idx_fv_path_rev ON field_values(field_path_rev);
+            CREATE INDEX idx_fv_value ON field_values(field_value);
         ";
         command.ExecuteNonQuery();
     }
