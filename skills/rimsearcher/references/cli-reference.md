@@ -176,7 +176,7 @@ rimsearcher find <fieldPath> <value> [--type T] [--mod M] [--limit N]
 
 | Parameter | Default | Description |
 |---|---|---|
-| `fieldPath` | required | Suffix-matched: `LIKE '%fieldPath'` |
+| `fieldPath` | required | Suffix-matched: `LIKE '%fieldPath'` — includes index segments: `pawnGroupMakers[0].kindDef` is queryable, `pawnGroupMakers.kindDef` (no `[i]`) matches nothing |
 | `value` | required | Exact match: `field_value = value` |
 | `--type` | null | Filter by def_type |
 | `--mod` | null | Filter by mod_name |
@@ -242,7 +242,7 @@ rimsearcher values <fieldPath> [--limit N]
 
 | Parameter | Default | Description |
 |---|---|---|
-| `fieldPath` | required | Suffix-matched: `LIKE '%fieldPath'` |
+| `fieldPath` | required | Suffix-matched: `LIKE '%fieldPath'` — includes index segments: `pawnGroupMakers[0].kindDef` is queryable, `pawnGroupMakers.kindDef` (no `[i]`) matches nothing |
 | `--type` | null | Filter by def_type |
 | `--limit` | 200 | Max distinct values |
 

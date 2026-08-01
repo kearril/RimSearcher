@@ -16,6 +16,10 @@ internal static class FieldCommands
             if (results.Count == 0)
             {
                 Console.Error.WriteLine($"Hint: no exact matches. Try fuzzy search: rimsearcher search \"{value}\"");
+                if (fieldPath.Contains('.') && !fieldPath.Contains('['))
+                    Console.Error.WriteLine(
+                        "Hint: field paths match literally as a suffix — nested list paths need their index segment " +
+                        "(e.g. 'pawnGroupMakers[0].kindDef'); or filter with 'get <def> --field <path>'");
                 // 无结果非零退出（stdout 仍输出 []），脚本可用退出码区分"未找到"与"查询失败"。
                 Environment.ExitCode = ExitCodes.NotFound;
             }
@@ -36,9 +40,15 @@ internal static class FieldCommands
         {
             var values = repository.GetValues(fieldPath, type, limit);
             output.Write(values);
-            // 无结果非零退出（stdout 仍输出 []）：与 find/get 的 NotFound 契约统一。
             if (values.Count == 0)
+            {
+                if (fieldPath.Contains('.') && !fieldPath.Contains('['))
+                    Console.Error.WriteLine(
+                        "Hint: field paths match literally as a suffix — nested list paths need their index segment " +
+                        "(e.g. 'pawnGroupMakers[0].kindDef'); or filter with 'get <def> --field <path>'");
+                // 无结果非零退出（stdout 仍输出 []）：与 find/get 的 NotFound 契约统一。
                 Environment.ExitCode = ExitCodes.NotFound;
+            }
         });
     }
 }
