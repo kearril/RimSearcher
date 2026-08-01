@@ -87,7 +87,9 @@ User names a C# type directly. Skip CLI.
 
 Verification means: **cross-check the Def numbers you found against the decompiled source** — does the located method/class actually reference the fields you extracted (baseValue, curve points, stage offsets)? Def values and formula constants must agree. If they do not, the field path or the decompiled target is wrong — retrace.
 
-Read `references/cli-reference.md` only when command parameters, output fields, FTS syntax, pagination/filtering, database schema, or an unexpected CLI result matters.
+CLI behavior questions — parameters, output fields, FTS syntax, pagination/filtering, database schema, exit codes, or any unexpected result — are answered by **reading `references/cli-reference.md` first**. The reference file is the contract.
+
+Before touching any game/mod XML for a Def-data question, **read `references/cli-reference.md` first** — its Data Limitations section explains what the database contains (runtime-merged defs, export-time language, depth caps); if the CLI already answers the question, the XML is unnecessary.
 Read `references/decompiler-mcp.md` only for context loading, recovery, inheritance/call-graph analysis, IL/transpiler work, or version comparison.
 
 ## Guardrails
@@ -97,6 +99,7 @@ Read `references/decompiler-mcp.md` only for context loading, recovery, inherita
 
 **NEVER:**
 - Guess field names — run `get --brief` or `fields` first.
+- Read local game/mod XML files (`RimWorld*/Mods/**/Defs/*.xml`, the game install dir, Steam workshop folders) to answer Def-data questions — `defs.db` is the **runtime-merged** export (post-inheritance, post-patch, plus runtime state); XML is raw source text and can disagree. The CLI is the only data query surface.
 - Invent method signatures — read decompiled source before patching.
 - Assume 1.5 APIs work in 1.6 — for method behavior, compare the two context aliases with `compare_symbols(..., compareMode:"body")` as described in `references/decompiler-mcp.md`.
 - Write a Harmony patch without reading IL — run `get_il` first.
