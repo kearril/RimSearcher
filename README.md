@@ -88,7 +88,7 @@ rimsearcher install
 | **RimSearcher.DataMod** | 从 [Releases](https://github.com/kearril/RimSearcher/releases/latest) 下载新版 `RimSearcher_DataMod.zip`，解压覆盖 Mods 目录即可                                                    |
 
 > 由于 skills 文件是影响ai决策的重要文件，可能频繁更新优化，而它的更新不会影响 CLI 和 datamod 的功能，
-> 因此 skills 不会一有更新就发布 Release。如何判断 skills 是否有更新？看这个标徽或者页面顶部的 ![Skills Update Time](https://img.shields.io/endpoint?url=https%3A%2F%2Fkearril.github.io%2FRimSearcher%2Fskills-update.json) 徽章；它显示整个 `skills/` 目录最后一次更新的 UTC 时间。显示的时间比本地文件新就说明有更新。
+> 因此 skills 不会一有更新就发布 Release。如何判断 skills 是否有更新？看这个标徽或者页面顶部的 ![Skills Update Time](https://img.shields.io/endpoint?url=https%3A%2F%2Fkearril.github.io%2FRimSearcher%2Fskills-update.json) 徽章；它显示整个 `skills/` 目录最后一次更新的 UTC+8 时间。显示的时间比本地文件新就说明有更新。
 
 ## 组件
 
