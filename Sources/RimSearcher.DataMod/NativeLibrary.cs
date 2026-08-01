@@ -12,14 +12,12 @@ namespace RimSearcher.DataMod;
 /// </summary>
 internal static class NativeLibrary
 {
-    // Windows
     [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
     private static extern IntPtr LoadLibrary(string fileName);
 
     [DllImport("kernel32.dll", CharSet = CharSet.Ansi, SetLastError = true)]
     private static extern IntPtr GetProcAddress(IntPtr module, string procName);
 
-    // POSIX（Linux / macOS）
     [DllImport("libdl", SetLastError = true)]
     private static extern IntPtr dlopen(string fileName, int flags);
 

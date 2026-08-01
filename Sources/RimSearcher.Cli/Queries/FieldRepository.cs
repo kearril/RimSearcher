@@ -90,18 +90,33 @@ internal sealed class FieldRepository
     /// </summary>
     private static void AnnotateReferences(SqliteConnection connection, List<FieldValue> values)
     {
+        if (values.Count == 0)
+            return;
+
+        // 只查候选 def_name（值命中 defs.def_name 才有标注意义）：去重后按批 IN 走
+        // idx_defs_name_type 索引，避免每次 fields 都全表扫描 defs（15,964 行）。
+        var candidates = values.Select(v => v.Value).Distinct(StringComparer.Ordinal).ToList();
         var lookup = new Dictionary<string, List<string>>(StringComparer.Ordinal);
         using (var command = connection.CreateCommand())
         {
-            command.CommandText = "SELECT def_name, def_type FROM defs";
-            using var reader = command.ExecuteReader();
-            while (reader.Read())
+            // SQLite 单语句变量数上限 999（默认），分批 500 留余量。
+            for (int offset = 0; offset < candidates.Count; offset += 500)
             {
-                var name = reader.GetString(0);
-                var type = reader.GetString(1);
-                if (!lookup.TryGetValue(name, out var types))
-                    lookup[name] = types = new List<string>();
-                types.Add(type);
+                var batch = candidates.GetRange(offset, Math.Min(500, candidates.Count - offset));
+                var placeholders = string.Join(", ", batch.Select((_, k) => $"@p{k}"));
+                command.CommandText = $"SELECT def_name, def_type FROM defs WHERE def_name IN ({placeholders})";
+                command.Parameters.Clear();
+                for (int k = 0; k < batch.Count; k++)
+                    command.Parameters.AddWithValue($"@p{k}", batch[k]);
+
+                using var reader = command.ExecuteReader();
+                while (reader.Read())
+                {
+                    var name = reader.GetString(0);
+                    if (!lookup.TryGetValue(name, out var types))
+                        lookup[name] = types = new List<string>();
+                    types.Add(reader.GetString(1));
+                }
             }
         }
 

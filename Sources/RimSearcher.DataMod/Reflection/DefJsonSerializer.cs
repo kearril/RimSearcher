@@ -145,7 +145,7 @@ internal static class DefJsonSerializer
     /// <summary>
     /// 输出浮点数值；非有限数输出带引号字符串（"NaN"/"Infinity"/"-Infinity"），
     /// 保留信息且产出合法 JSON（RFC 8259：非有限数应序列化为 null 或字符串）。
-    /// 数值格式保持 G（float G7 / double G15，与既有输出契约一致）。
+    /// 数值格式保持 G（float G7 / double G15，与输出契约一致）。
     /// </summary>
     private static void AppendNonFiniteAsQuoted(float value, StringBuilder builder)
     {
