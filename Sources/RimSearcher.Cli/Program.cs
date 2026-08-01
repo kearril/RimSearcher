@@ -19,7 +19,7 @@ app.UseFilter<CliExceptionFilter>();
 var defRepository = new DefRepository(connectionFactory);
 SearchCommands.Register(app, defRepository, output);
 DefCommands.Register(app, defRepository, output);
-FieldCommands.Register(app, new FieldRepository(connectionFactory), output);
+FieldCommands.Register(app, new FieldRepository(connectionFactory), defRepository, output);
 StatisticsCommands.Register(app, new StatisticsRepository(connectionFactory), output);
 MaintenanceCommands.Register(app);
 

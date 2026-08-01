@@ -9,9 +9,60 @@ internal sealed class DefRepository
 {
     private readonly DatabaseConnectionFactory _connections;
 
+    // def_type 白名单缓存：进程内首次查询后不变（CLI 只读单一 db），顺序执行无并发。
+    private static readonly HashSet<string> KnownTypes = new(StringComparer.Ordinal);
+    private static bool _typesLoaded;
+
     public DefRepository(DatabaseConnectionFactory connections)
     {
         _connections = connections;
+    }
+
+    /// <summary>
+    /// def_type 是否存在于当前库（--type 参数校验用）：拼错的类型会静默返回空结果，
+    /// 无法与"确实无匹配"区分，故查询前拦截。
+    /// </summary>
+    public bool IsKnownType(string type)
+    {
+        if (!_typesLoaded)
+        {
+            using var connection = _connections.Open();
+            using var command = connection.CreateCommand();
+            command.CommandText = "SELECT DISTINCT def_type FROM defs";
+            using var reader = command.ExecuteReader();
+            while (reader.Read())
+                KnownTypes.Add(reader.GetString(0));
+            _typesLoaded = true;
+        }
+
+        return KnownTypes.Contains(type);
+    }
+
+    /// <summary>
+    /// get 未命中时的相似名候选（同类型 LIKE 模糊匹配），供错误消息指引；
+    /// 大小写不敏感，type 可为 null（按全库匹配）。
+    /// </summary>
+    public IReadOnlyList<string> FindSimilarDefNames(string defName, string? type, int limit)
+    {
+        using var connection = _connections.Open();
+        using var command = connection.CreateCommand();
+        command.CommandText = """
+            SELECT def_name
+            FROM defs
+            WHERE (@type IS NULL OR def_type = @type)
+              AND def_name LIKE '%' || @name || '%'
+            ORDER BY def_name
+            LIMIT @limit
+            """;
+        QueryParameters.AddFilters(command, type, null);
+        command.Parameters.AddWithValue("@name", defName);
+        command.Parameters.AddWithValue("@limit", limit);
+
+        var results = new List<string>();
+        using var reader = command.ExecuteReader();
+        while (reader.Read())
+            results.Add(reader.GetString(0));
+        return results;
     }
 
     public long CountSearchResults(string keyword, string? type, string? mod)

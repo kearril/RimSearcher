@@ -14,6 +14,9 @@ internal static class DefCommands
     {
         app.Add("get", ([Argument] string defName, string? type = null, bool brief = false, string? field = null) =>
         {
+            if (TypeGuard.RejectUnknown(type, repository))
+                return;
+
             // 参数互斥：--brief 与 --field 都是提取视图，同时给出为参数错误。
             if (brief && field != null)
             {
@@ -27,6 +30,7 @@ internal static class DefCommands
                 if (types.Count == 0)
                 {
                     Console.Error.WriteLine($"Error: no Def found with defName '{defName}'");
+                    WriteNotFoundHint(repository, defName, null);
                     Environment.Exit(ExitCodes.NotFound);
                 }
                 if (types.Count > 1)
@@ -45,6 +49,7 @@ internal static class DefCommands
                 if (source == null)
                 {
                     Console.Error.WriteLine($"Error: no Def found with defName '{defName}' and type '{type}'");
+                    WriteNotFoundHint(repository, defName, type);
                     Environment.Exit(ExitCodes.NotFound);
                 }
 
@@ -74,6 +79,7 @@ internal static class DefCommands
                 if (source == null)
                 {
                     Console.Error.WriteLine($"Error: no Def found with defName '{defName}' and type '{type}'");
+                    WriteNotFoundHint(repository, defName, type);
                     Environment.Exit(ExitCodes.NotFound);
                 }
 
@@ -97,10 +103,23 @@ internal static class DefCommands
             if (fullData == null)
             {
                 Console.Error.WriteLine($"Error: no Def found with defName '{defName}' and type '{type}'");
+                WriteNotFoundHint(repository, defName, type);
                 Environment.Exit(ExitCodes.NotFound);
             }
             Console.WriteLine(fullData);
         });
+    }
+
+    /// <summary>
+    /// 未命中时的方向指引：同类型相似名候选（最多 5 个）+ 抽象 Def 说明——
+    /// 不解释时调用方会误以为名字错误而转向 XML 排查（抽象模板运行时不存在，与拼写无关）。
+    /// </summary>
+    private static void WriteNotFoundHint(DefRepository repository, string defName, string? type)
+    {
+        var similar = repository.FindSimilarDefNames(defName, type, 5);
+        if (similar.Count > 0)
+            Console.Error.WriteLine($"Did you mean: {string.Join(", ", similar)}?");
+        Console.Error.WriteLine("Note: abstract Defs (Abstract=\"true\") are never instantiated and never appear in the database");
     }
 
     /// <summary>

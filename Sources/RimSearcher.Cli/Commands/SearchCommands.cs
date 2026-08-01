@@ -11,6 +11,9 @@ internal static class SearchCommands
     {
         app.Add("search", ([Argument] string keyword, string? type = null, string? mod = null, int limit = 20, bool count = false) =>
         {
+            if (TypeGuard.RejectUnknown(type, repository))
+                return;
+
             if (count)
             {
                 var countResult = repository.CountSearchResults(keyword, type, mod);
@@ -34,6 +37,9 @@ internal static class SearchCommands
 
         app.Add("list", (string? type = null, string? mod = null, int limit = 20, int offset = 0, bool total = false) =>
         {
+            if (TypeGuard.RejectUnknown(type, repository))
+                return;
+
             var results = repository.List(type, mod, limit, offset);
             if (total)
                 output.Write(new { total = repository.CountListed(type, mod), results });
