@@ -15,6 +15,16 @@ internal static class ReleaseUpdater
 
     public static void Update()
     {
+        var executableDirectory = Path.GetDirectoryName(Environment.ProcessPath)!;
+
+        // 上次后台替换失败会留下标记文件：提示而不是再次静默尝试。
+        var errorMarkerPath = Path.Combine(executableDirectory, "rimsearcher.update.err");
+        if (File.Exists(errorMarkerPath))
+        {
+            Console.Error.WriteLine($"Previous auto-update failed: {File.ReadAllText(errorMarkerPath).Trim()}");
+            TryDelete(errorMarkerPath);
+        }
+
         using var http = new HttpClient(new HttpClientHandler { AllowAutoRedirect = false });
         http.DefaultRequestHeaders.UserAgent.ParseAdd(ApplicationName);
 
@@ -45,8 +55,8 @@ internal static class ReleaseUpdater
         }
 
         var downloadUrl = $"{ReleaseDownloadUrl}/{tag}/rimsearcher.exe";
-        var executableDirectory = Path.GetDirectoryName(Environment.ProcessPath)!;
         var newExecutablePath = Path.Combine(executableDirectory, "rimsearcher.new.exe");
+        TryDelete(newExecutablePath); // 清理上次失败的残留，避免被占用时 File.Create 抛错。
 
         try
         {
@@ -63,12 +73,18 @@ internal static class ReleaseUpdater
             Environment.Exit(ExitCodes.Error);
         }
 
-        var batchPath = Path.Combine(executableDirectory, "rimsearcher.update.bat");
-        File.WriteAllText(batchPath, $"@echo off\r\ntimeout /t 2 /nobreak > nul\r\nmove /y \"{newExecutablePath}\" \"{Environment.ProcessPath}\"\r\ndel \"%~f0\"\r\n");
-
+        // 更新器副本：复制自身为独立文件再运行。
+        // 副本进程锁的是副本文件，目标 rimsearcher.exe 不被任何进程持有，替换才可能成功；
+        // 若直接以自身启动 --internal-replace，子进程会锁住目标导致覆盖必败。
+        // 不用 bat：UTF-8 脚本被 cmd 按 ANSI 代码页（中文系统 GBK）误读导致 move 静默失败（实测），
+        // 且 bat 是 Windows-only，与多平台目标冲突。
+        var updaterPath = Path.Combine(executableDirectory, "rimsearcher.updater.exe");
         try
         {
-            Process.Start(new ProcessStartInfo("cmd", $"/c \"{batchPath}\"")
+            TryDelete(updaterPath); // 清理上次运行的残留副本（旧副本早已退出，可删）。
+            File.Copy(Environment.ProcessPath!, updaterPath, overwrite: true);
+            Process.Start(new ProcessStartInfo(updaterPath,
+                $"\"--internal-replace\" \"{newExecutablePath}\" \"{Environment.ProcessPath}\" {Environment.ProcessId}")
             {
                 CreateNoWindow = true,
                 UseShellExecute = false
@@ -81,8 +97,97 @@ internal static class ReleaseUpdater
             Environment.Exit(ExitCodes.Error);
         }
 
-        Console.WriteLine($"Downloaded {latestVersion}, installing...");
+        Console.WriteLine($"Downloaded {latestVersion}, installing in background...");
+        Console.WriteLine("Run 'rimsearcher --version' in a few seconds to confirm; a failed swap leaves rimsearcher.update.err next to the exe.");
         Environment.Exit(ExitCodes.Success);
+    }
+
+    /// <summary>
+    /// 内部替换命令（--internal-replace，经 Program.cs 拦截，不进 help）：
+    /// 由 updater 副本进程执行，在主进程退出后替换目标 exe。
+    /// </summary>
+    public static int InternalReplace(string newPath, string targetPath, string parentPid)
+    {
+        // 等待父进程退出（200ms 轮询，最多 30s）：目标 exe 的锁随父进程退出释放。
+        if (int.TryParse(parentPid, out var pid))
+        {
+            var deadline = DateTime.UtcNow.AddSeconds(30);
+            while (DateTime.UtcNow < deadline)
+            {
+                try
+                {
+                    if (Process.GetProcessById(pid).HasExited)
+                        break;
+                }
+                catch (ArgumentException)
+                {
+                    break; // 进程已不存在，锁已释放。
+                }
+                Thread.Sleep(200);
+            }
+        }
+
+        // 重试应对短暂占用（杀软扫描、并发实例）。
+        Exception? lastError = null;
+        for (var attempt = 0; attempt < 3; attempt++)
+        {
+            try
+            {
+                File.Move(newPath, targetPath, overwrite: true);
+                lastError = null;
+                break;
+            }
+            catch (Exception exception)
+            {
+                lastError = exception;
+                Thread.Sleep(500 * (attempt + 1));
+            }
+        }
+
+        var directory = Path.GetDirectoryName(targetPath)!;
+        if (lastError == null)
+        {
+            TryDelete(Path.Combine(directory, "rimsearcher.update.err")); // 成功时清除历史失败标记。
+            Console.WriteLine("rimsearcher updated successfully.");
+        }
+        else
+        {
+            File.WriteAllText(Path.Combine(directory, "rimsearcher.update.err"),
+                $"{lastError.GetType().Name}: {lastError.Message}");
+            Console.Error.WriteLine($"Update failed: {lastError.Message}");
+            TrySelfDelete();
+            return ExitCodes.Error;
+        }
+
+        TrySelfDelete();
+        return ExitCodes.Success;
+    }
+
+    /// <summary>
+    /// 自删当前进程的 exe：POSIX 允许删除运行中的文件；Windows 需 cmd 兜底（进程退出后执行）。
+    /// 兜底失败也无害：下次 update 前会清理残留副本。
+    /// </summary>
+    private static void TrySelfDelete()
+    {
+        try
+        {
+            File.Delete(Environment.ProcessPath!);
+        }
+        catch
+        {
+            try
+            {
+                Process.Start(new ProcessStartInfo("cmd", $"/c del \"{Environment.ProcessPath}\"")
+                {
+                    CreateNoWindow = true,
+                    UseShellExecute = false
+                });
+            }
+            catch
+            {
+                // 清理失败无害：下次 update 前会再清理残留副本。
+            }
+        }
     }
 
     private static void TryDelete(string path)

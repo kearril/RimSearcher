@@ -23,4 +23,11 @@ FieldCommands.Register(app, new FieldRepository(connectionFactory), output);
 StatisticsCommands.Register(app, new StatisticsRepository(connectionFactory), output);
 MaintenanceCommands.Register(app);
 
+// 内部自更新替换命令：不经 CAF 路由，不进 help（用户决策）。
+// 由 update 复制的 updater 副本进程调用，在主进程退出后替换目标 exe。
+if (args.Length == 4 && args[0] == "--internal-replace")
+{
+    Environment.Exit(RimSearcher.Cli.Maintenance.ReleaseUpdater.InternalReplace(args[1], args[2], args[3]));
+}
+
 app.Run(args);
