@@ -6,7 +6,6 @@
         <LangVersion>Latest</LangVersion>
         <Version>3.1.0</Version>
         <Nullable>enable</Nullable>
-        <!-- 显式确定性构建：产物与构建器/时序无关（防御 IDE 后台构建差异）。 -->
         <Deterministic>true</Deterministic>
         <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
         <AppendRuntimeIdentifierToOutputPath>false</AppendRuntimeIdentifierToOutputPath>
@@ -15,7 +14,21 @@
 
     <ItemGroup>
       <PackageReference Include="Krafs.Rimworld.Ref" Version="1.6.4871" />
-      <PackageReference Include="System.Data.SQLite.Core" Version="1.0.119" />
+      <PackageReference Include="Microsoft.Data.Sqlite.Core" Version="8.0.*" />
+      <PackageReference Include="SQLitePCLRaw.core" Version="2.1.*" />
+      <PackageReference Include="SQLitePCLRaw.provider.dynamic_cdecl" Version="2.1.*" />
+      <PackageReference Include="SQLitePCLRaw.lib.e_sqlite3" Version="2.1.*" ExcludeAssets="all" GeneratePathProperty="true" />
     </ItemGroup>
+
+    <Target Name="CopySqliteNative" AfterTargets="Build">
+      <ItemGroup>
+        <NativeRuntime Include="$(PkgSQLitePCLRaw_lib_e_sqlite3)\runtimes\win-x64\native\e_sqlite3.dll" />
+        <NativeRuntime Include="$(PkgSQLitePCLRaw_lib_e_sqlite3)\runtimes\linux-x64\native\libe_sqlite3.so" />
+        <NativeRuntime Include="$(PkgSQLitePCLRaw_lib_e_sqlite3)\runtimes\osx-x64\native\libe_sqlite3.dylib" />
+      </ItemGroup>
+      <Copy SourceFiles="@(NativeRuntime)"
+            DestinationFolder="..\..\RimSearcher_DataMod\Native\"
+            SkipUnchangedFiles="true" />
+    </Target>
 
 </Project>

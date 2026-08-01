@@ -1,27 +1,26 @@
 using System;
-using System.Data;
-using System.Data.SQLite;
+using Microsoft.Data.Sqlite;
 
 namespace RimSearcher.DataMod.Export;
 
 internal sealed class SearchIndexWriter : IDisposable
 {
-    private readonly SQLiteCommand _command;
-    private readonly SQLiteParameter _rowId;
-    private readonly SQLiteParameter _defName;
-    private readonly SQLiteParameter _label;
-    private readonly SQLiteParameter _description;
-    private readonly SQLiteParameter _fullText;
+    private readonly SqliteCommand _command;
+    private readonly SqliteParameter _rowId;
+    private readonly SqliteParameter _defName;
+    private readonly SqliteParameter _label;
+    private readonly SqliteParameter _description;
+    private readonly SqliteParameter _fullText;
 
-    public SearchIndexWriter(SQLiteConnection connection)
+    public SearchIndexWriter(SqliteConnection connection)
     {
         _command = connection.CreateCommand();
         _command.CommandText = "INSERT INTO defs_fts(rowid, def_name, label, description, full_text) VALUES (@rid, @fdn, @flbl, @fdesc, @ftxt)";
-        _rowId = _command.Parameters.Add("@rid", DbType.Int32);
-        _defName = _command.Parameters.Add("@fdn", DbType.String);
-        _label = _command.Parameters.Add("@flbl", DbType.String);
-        _description = _command.Parameters.Add("@fdesc", DbType.String);
-        _fullText = _command.Parameters.Add("@ftxt", DbType.String);
+        _rowId = _command.Parameters.Add("@rid", SqliteType.Integer);
+        _defName = _command.Parameters.Add("@fdn", SqliteType.Text);
+        _label = _command.Parameters.Add("@flbl", SqliteType.Text);
+        _description = _command.Parameters.Add("@fdesc", SqliteType.Text);
+        _fullText = _command.Parameters.Add("@ftxt", SqliteType.Text);
     }
 
     public void Write(int rowId, string defName, string? label, string? description, string fullText)

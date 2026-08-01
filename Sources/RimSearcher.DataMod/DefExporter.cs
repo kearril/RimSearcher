@@ -28,7 +28,7 @@ public static class DefExporter
             Log("Deleted old database file");
         }
 
-        using var conn = ExportDatabase.Open(dbPath, Log);
+        using var conn = ExportDatabase.Open(dbPath);
         ExportSchema.Create(conn);
         Log("Database schema created");
 

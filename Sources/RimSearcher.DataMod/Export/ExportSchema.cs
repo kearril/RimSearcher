@@ -1,10 +1,10 @@
-using System.Data.SQLite;
+using Microsoft.Data.Sqlite;
 
 namespace RimSearcher.DataMod.Export;
 
 internal static class ExportSchema
 {
-    public static void Create(SQLiteConnection connection)
+    public static void Create(SqliteConnection connection)
     {
         using var command = connection.CreateCommand();
         command.CommandText = "PRAGMA encoding='UTF-8'";

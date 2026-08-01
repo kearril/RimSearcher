@@ -18,6 +18,15 @@ public class RimSearcherMod : Mod
     public RimSearcherMod(ModContentPack content) : base(content)
     {
         _exportPath = Path.Combine(content.RootDir, "defs.db");
+        try
+        {
+            NativeLibrary.Initialize(content.RootDir);
+        }
+        catch (Exception ex)
+        {
+            // 初始化失败不中断游戏：导出流程会自然报错并显示失败原因。
+            Verse.Log.Error($"[RimSearcher] SQLite native library initialization failed: {ex.Message}");
+        }
     }
 
     public override void DoSettingsWindowContents(Rect inRect)

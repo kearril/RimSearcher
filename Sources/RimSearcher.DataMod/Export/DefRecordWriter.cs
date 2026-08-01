@@ -1,6 +1,5 @@
 using System;
-using System.Data;
-using System.Data.SQLite;
+using Microsoft.Data.Sqlite;
 
 namespace RimSearcher.DataMod.Export;
 
@@ -9,32 +8,32 @@ namespace RimSearcher.DataMod.Export;
 /// </summary>
 internal sealed class DefRecordWriter : IDisposable
 {
-    private readonly SQLiteCommand _command;
-    private readonly SQLiteParameter _id;
-    private readonly SQLiteParameter _defName;
-    private readonly SQLiteParameter _defType;
-    private readonly SQLiteParameter _label;
-    private readonly SQLiteParameter _description;
-    private readonly SQLiteParameter _modName;
-    private readonly SQLiteParameter _packageId;
-    private readonly SQLiteParameter _sourceFile;
-    private readonly SQLiteParameter _fullData;
+    private readonly SqliteCommand _command;
+    private readonly SqliteParameter _id;
+    private readonly SqliteParameter _defName;
+    private readonly SqliteParameter _defType;
+    private readonly SqliteParameter _label;
+    private readonly SqliteParameter _description;
+    private readonly SqliteParameter _modName;
+    private readonly SqliteParameter _packageId;
+    private readonly SqliteParameter _sourceFile;
+    private readonly SqliteParameter _fullData;
 
-    public DefRecordWriter(SQLiteConnection connection)
+    public DefRecordWriter(SqliteConnection connection)
     {
         _command = connection.CreateCommand();
         _command.CommandText = @"
             INSERT INTO defs (id, def_name, def_type, label, description, mod_name, package_id, source_file, full_data)
             VALUES (@id, @dn, @dt, @lbl, @desc, @mod, @pkg, @src, @data)";
-        _id = _command.Parameters.Add("@id", DbType.Int32);
-        _defName = _command.Parameters.Add("@dn", DbType.String);
-        _defType = _command.Parameters.Add("@dt", DbType.String);
-        _label = _command.Parameters.Add("@lbl", DbType.String);
-        _description = _command.Parameters.Add("@desc", DbType.String);
-        _modName = _command.Parameters.Add("@mod", DbType.String);
-        _packageId = _command.Parameters.Add("@pkg", DbType.String);
-        _sourceFile = _command.Parameters.Add("@src", DbType.String);
-        _fullData = _command.Parameters.Add("@data", DbType.String);
+        _id = _command.Parameters.Add("@id", SqliteType.Integer);
+        _defName = _command.Parameters.Add("@dn", SqliteType.Text);
+        _defType = _command.Parameters.Add("@dt", SqliteType.Text);
+        _label = _command.Parameters.Add("@lbl", SqliteType.Text);
+        _description = _command.Parameters.Add("@desc", SqliteType.Text);
+        _modName = _command.Parameters.Add("@mod", SqliteType.Text);
+        _packageId = _command.Parameters.Add("@pkg", SqliteType.Text);
+        _sourceFile = _command.Parameters.Add("@src", SqliteType.Text);
+        _fullData = _command.Parameters.Add("@data", SqliteType.Text);
     }
 
     public void Write(

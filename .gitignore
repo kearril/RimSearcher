@@ -8,6 +8,7 @@ obj/
 
 # 构建产物二进制（发布时从工作区构建产物打包）
 /RimSearcher_DataMod/Assemblies/
+/RimSearcher_DataMod/Native/
 
 # IDE settings
 .idea/

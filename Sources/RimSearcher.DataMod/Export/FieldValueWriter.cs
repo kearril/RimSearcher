@@ -1,6 +1,5 @@
 using System.Collections.Generic;
-using System.Data;
-using System.Data.SQLite;
+using Microsoft.Data.Sqlite;
 
 namespace RimSearcher.DataMod.Export;
 
@@ -9,13 +8,13 @@ namespace RimSearcher.DataMod.Export;
 /// </summary>
 internal static class FieldValueWriter
 {
-    public static void Flush(SQLiteConnection connection, List<(int DefId, string FieldPath, string FieldValue)> values)
+    public static void Flush(SqliteConnection connection, List<(int DefId, string FieldPath, string FieldValue)> values)
     {
         using var command = connection.CreateCommand();
         command.CommandText = "INSERT INTO field_values (def_id, field_path, field_value) VALUES (@did, @fp, @fv)";
-        var defId = command.Parameters.Add("@did", DbType.Int32);
-        var fieldPath = command.Parameters.Add("@fp", DbType.String);
-        var fieldValue = command.Parameters.Add("@fv", DbType.String);
+        var defId = command.Parameters.Add("@did", SqliteType.Integer);
+        var fieldPath = command.Parameters.Add("@fp", SqliteType.Text);
+        var fieldValue = command.Parameters.Add("@fv", SqliteType.Text);
 
         foreach (var value in values)
         {
