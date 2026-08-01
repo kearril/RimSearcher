@@ -37,13 +37,13 @@ internal static class ExportDatabase
         var architecture = IntPtr.Size == 8 ? "x64" : "x86";
         var assemblyDirectory = Path.GetDirectoryName(typeof(ExportDatabase).Assembly.Location)!;
         var interopPath = Path.Combine(assemblyDirectory, architecture, "SQLite.Interop.dll");
-        log($"尝试加载 FTS5 扩展: {interopPath} (exists={File.Exists(interopPath)})");
+        log($"Trying to load FTS5 extension: {interopPath} (exists={File.Exists(interopPath)})");
 
         var handle = LoadLibrary(interopPath);
-        log($"预加载结果: 0x{handle.ToInt64():X}");
+        log($"Preload result: 0x{handle.ToInt64():X}");
 
         connection.LoadExtension(interopPath, "sqlite3_fts5_init");
-        log("已加载 FTS5 扩展");
+        log("FTS5 extension loaded");
     }
 
     private static void Configure(SQLiteConnection connection)

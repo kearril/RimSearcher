@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LanguageData>
+  <RimSearcher.ExportPathLabel>Export path:</RimSearcher.ExportPathLabel>
+  <RimSearcher.OpenInExplorer>Open in file explorer</RimSearcher.OpenInExplorer>
+  <RimSearcher.ExportDefDatabase>Export Def database</RimSearcher.ExportDefDatabase>
+  <RimSearcher.DialogTitle>Export Def database</RimSearcher.DialogTitle>
+  <RimSearcher.ExportingWarning>Exporting, do not close this window...</RimSearcher.ExportingWarning>
+  <RimSearcher.Close>Close</RimSearcher.Close>
+  <RimSearcher.ExportDone>Export complete!</RimSearcher.ExportDone>
+  <RimSearcher.ExportFailed>Export failed</RimSearcher.ExportFailed>
+  <RimSearcher.Error>Error: {0}</RimSearcher.Error>
+  <RimSearcher.Elapsed>Elapsed: {0}</RimSearcher.Elapsed>
+  <RimSearcher.ElapsedEta>Elapsed: {0}  Estimated remaining: {1}</RimSearcher.ElapsedEta>
+</LanguageData>

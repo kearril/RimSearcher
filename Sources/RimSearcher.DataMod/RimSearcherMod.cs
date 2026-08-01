@@ -24,17 +24,17 @@ public class RimSearcherMod : Mod
     {
         float y = inRect.y;
 
-        Widgets.Label(new Rect(0f, y, inRect.width, 24f), "导出路径:");
+        Widgets.Label(new Rect(0f, y, inRect.width, 24f), "RimSearcher.ExportPathLabel".Translate());
         y += 26f;
 
         _exportPath = Widgets.TextField(new Rect(0f, y, inRect.width, 28f), _exportPath);
         y += 42f;
 
-        if (Widgets.ButtonText(new Rect(0f, y, ButtonWidth, ButtonHeight), "在资源管理器中打开"))
+        if (Widgets.ButtonText(new Rect(0f, y, ButtonWidth, ButtonHeight), "RimSearcher.OpenInExplorer".Translate()))
             OpenInExplorer();
         y += ButtonHeight + 6f;
 
-        if (Widgets.ButtonText(new Rect(0f, y, ButtonWidth, ButtonHeight), "导出 Def 数据库"))
+        if (Widgets.ButtonText(new Rect(0f, y, ButtonWidth, ButtonHeight), "RimSearcher.ExportDefDatabase".Translate()))
         {
             var path = ResolveExportPath(_exportPath);
             Find.WindowStack.Add(new Dialog_ExportProgress(path));
@@ -49,14 +49,29 @@ public class RimSearcherMod : Mod
         try
         {
             var dir = Path.GetDirectoryName(_exportPath);
-            if (!string.IsNullOrEmpty(dir) && Directory.Exists(dir))
-                Process.Start("explorer.exe", "/select,\"" + _exportPath + "\"");
-            else if (Directory.Exists(_exportPath))
-                Process.Start("explorer.exe", _exportPath);
+            if (Environment.OSVersion.Platform == PlatformID.Win32NT)
+            {
+                if (!string.IsNullOrEmpty(dir) && Directory.Exists(dir))
+                    Process.Start("explorer.exe", "/select,\"" + _exportPath + "\"");
+                else if (Directory.Exists(_exportPath))
+                    Process.Start("explorer.exe", _exportPath);
+            }
+            else if (Environment.OSVersion.Platform == PlatformID.MacOSX)
+            {
+                var target = Directory.Exists(_exportPath) ? _exportPath : dir;
+                if (!string.IsNullOrEmpty(target) && Directory.Exists(target))
+                    Process.Start("open", "\"" + target + "\"");
+            }
+            else
+            {
+                var target = Directory.Exists(_exportPath) ? _exportPath : dir;
+                if (!string.IsNullOrEmpty(target) && Directory.Exists(target))
+                    Process.Start("xdg-open", "\"" + target + "\"");
+            }
         }
         catch (Exception ex)
         {
-            Verse.Log.Error($"[RimSearcher] 打开资源管理器失败: {ex}");
+            Verse.Log.Error($"[RimSearcher] Failed to open file manager: {ex}");
         }
     }
 

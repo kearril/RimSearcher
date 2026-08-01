@@ -17,7 +17,6 @@ public class Dialog_ExportProgress : Window
     // 以下字段由后台导出线程写入、主线程每帧读取，需 volatile 保证可见性。
     private volatile int _current;
     private volatile int _total;
-    private volatile string _status = "准备中...";
     private volatile string? _error;
     private long _endTicks;
 
@@ -49,19 +48,16 @@ public class Dialog_ExportProgress : Window
         {
             DefExporter.Export(_dbPath,
                 log: msg => Verse.Log.Message($"[RimSearcher] {msg}"),
-                progress: (current, total, status) =>
+                progress: (current, total) =>
                 {
                     _current = current;
                     _total = total;
-                    _status = status;
                 });
-            _status = "导出完成!";
         }
         catch (Exception ex)
         {
             _error = ex.Message;
-            _status = "导出失败";
-            Verse.Log.Error($"[RimSearcher] 导出失败: {ex}");
+            Verse.Log.Error($"[RimSearcher] Export failed: {ex}");
         }
     }
 
@@ -81,7 +77,7 @@ public class Dialog_ExportProgress : Window
         float y = inRect.y + ContentMargin;
 
         Text.Font = GameFont.Medium;
-        Widgets.Label(new Rect(ContentMargin, y, width, 36f), "导出 Def 数据库");
+        Widgets.Label(new Rect(ContentMargin, y, width, 36f), "RimSearcher.DialogTitle".Translate());
         Text.Font = GameFont.Small;
         y += 48f;
 
@@ -98,12 +94,12 @@ public class Dialog_ExportProgress : Window
                 var elapsed = GetElapsed();
                 if (done)
                 {
-                    Widgets.Label(new Rect(ContentMargin, y, width, 22f), $"已用: {FormatTime(elapsed)}");
+                    Widgets.Label(new Rect(ContentMargin, y, width, 22f), "RimSearcher.Elapsed".Translate(FormatTime(elapsed)));
                 }
                 else
                 {
                     var eta = TimeSpan.FromTicks((long)(elapsed.Ticks / pct - elapsed.Ticks));
-                    Widgets.Label(new Rect(ContentMargin, y, width, 22f), $"已用: {FormatTime(elapsed)}  预计剩余: {FormatTime(eta)}");
+                    Widgets.Label(new Rect(ContentMargin, y, width, 22f), "RimSearcher.ElapsedEta".Translate(FormatTime(elapsed), FormatTime(eta)));
                 }
                 y += 28f;
             }
@@ -113,26 +109,28 @@ public class Dialog_ExportProgress : Window
             }
         }
 
-        Widgets.Label(new Rect(ContentMargin, y, width, 28f), _status);
-        y += 40f;
-
         if (done)
         {
+            Widgets.Label(new Rect(ContentMargin, y, width, 28f), _error != null
+                ? "RimSearcher.ExportFailed".Translate()
+                : "RimSearcher.ExportDone".Translate());
+            y += 40f;
+
             if (_error != null)
             {
-                Widgets.Label(new Rect(ContentMargin, y, width, 24f), $"错误: {_error}");
+                Widgets.Label(new Rect(ContentMargin, y, width, 24f), "RimSearcher.Error".Translate(_error));
                 y += 32f;
             }
 
             float buttonX = (inRect.width - CloseButtonWidth) / 2f;
-            if (Widgets.ButtonText(new Rect(buttonX, y, CloseButtonWidth, 42f), "关闭"))
+            if (Widgets.ButtonText(new Rect(buttonX, y, CloseButtonWidth, 42f), "RimSearcher.Close".Translate()))
             {
                 Close();
             }
         }
         else
         {
-            Widgets.Label(new Rect(ContentMargin, y, width, 24f), "正在导出，请勿关闭此窗口...");
+            Widgets.Label(new Rect(ContentMargin, y, width, 28f), "RimSearcher.ExportingWarning".Translate());
         }
     }
 

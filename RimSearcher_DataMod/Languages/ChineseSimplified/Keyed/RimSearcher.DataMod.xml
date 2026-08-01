@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LanguageData>
+  <RimSearcher.ExportPathLabel>导出路径:</RimSearcher.ExportPathLabel>
+  <RimSearcher.OpenInExplorer>在资源管理器中打开</RimSearcher.OpenInExplorer>
+  <RimSearcher.ExportDefDatabase>导出 Def 数据库</RimSearcher.ExportDefDatabase>
+  <RimSearcher.DialogTitle>导出 Def 数据库</RimSearcher.DialogTitle>
+  <RimSearcher.ExportingWarning>正在导出，请勿关闭此窗口...</RimSearcher.ExportingWarning>
+  <RimSearcher.Close>关闭</RimSearcher.Close>
+  <RimSearcher.ExportDone>导出完成!</RimSearcher.ExportDone>
+  <RimSearcher.ExportFailed>导出失败</RimSearcher.ExportFailed>
+  <RimSearcher.Error>错误: {0}</RimSearcher.Error>
+  <RimSearcher.Elapsed>已用: {0}</RimSearcher.Elapsed>
+  <RimSearcher.ElapsedEta>已用: {0}  预计剩余: {1}</RimSearcher.ElapsedEta>
+</LanguageData>

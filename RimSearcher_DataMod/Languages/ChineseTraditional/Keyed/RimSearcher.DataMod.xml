@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LanguageData>
+  <RimSearcher.ExportPathLabel>匯出路徑:</RimSearcher.ExportPathLabel>
+  <RimSearcher.OpenInExplorer>在檔案管理員中開啟</RimSearcher.OpenInExplorer>
+  <RimSearcher.ExportDefDatabase>匯出 Def 資料庫</RimSearcher.ExportDefDatabase>
+  <RimSearcher.DialogTitle>匯出 Def 資料庫</RimSearcher.DialogTitle>
+  <RimSearcher.ExportingWarning>正在匯出，請勿關閉此視窗...</RimSearcher.ExportingWarning>
+  <RimSearcher.Close>關閉</RimSearcher.Close>
+  <RimSearcher.ExportDone>匯出完成!</RimSearcher.ExportDone>
+  <RimSearcher.ExportFailed>匯出失敗</RimSearcher.ExportFailed>
+  <RimSearcher.Error>錯誤: {0}</RimSearcher.Error>
+  <RimSearcher.Elapsed>已用: {0}</RimSearcher.Elapsed>
+  <RimSearcher.ElapsedEta>已用: {0}  預計剩餘: {1}</RimSearcher.ElapsedEta>
+</LanguageData>

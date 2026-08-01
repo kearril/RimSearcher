@@ -16,28 +16,28 @@ public static class DefExporter
     /// <summary>
     /// 将当前加载的全部 RimWorld Def 导出为可检索的 SQLite 数据库。
     /// </summary>
-    public static void Export(string dbPath, Action<string>? log = null, Action<int, int, string>? progress = null)
+    public static void Export(string dbPath, Action<string>? log = null, Action<int, int>? progress = null)
     {
         void Log(string msg) => log?.Invoke(msg);
 
-        Log($"开始导出 Def 数据库到: {dbPath}");
+        Log($"Exporting Def database to: {dbPath}");
 
         if (File.Exists(dbPath))
         {
             File.Delete(dbPath);
-            Log("已删除旧数据库文件");
+            Log("Deleted old database file");
         }
 
         using var conn = ExportDatabase.Open(dbPath, Log);
         ExportSchema.Create(conn);
-        Log("数据库 schema 已创建");
+        Log("Database schema created");
 
         var defTypes = GenDefDatabase.AllDefTypesWithDatabases().ToList();
-        Log($"发现 {defTypes.Count} 个 Def 类型");
+        Log($"Found {defTypes.Count} Def types");
 
         int estimatedTotal = CountDefs(defTypes);
-        Log($"预估总数: {estimatedTotal} 个 Def");
-        progress?.Invoke(0, estimatedTotal, "开始处理...");
+        Log($"Estimated total: {estimatedTotal} Defs");
+        progress?.Invoke(0, estimatedTotal);
 
         int totalDefs = 0;
         int defId = 0;
@@ -57,7 +57,7 @@ public static class DefExporter
                 }
                 catch (Exception ex)
                 {
-                    Log($"跳过类型 {defType.Name}: {ex.Message}");
+                    Log($"Skipping type {defType.Name}: {ex.Message}");
                     continue;
                 }
 
@@ -75,7 +75,7 @@ public static class DefExporter
                     }
                     catch (Exception ex)
                     {
-                        Log($"序列化失败 {typeName}/{def.defName}: {ex.Message}");
+                        Log($"Serialization failed {typeName}/{def.defName}: {ex.Message}");
                         // 与真实空对象可区分的失败标记，供查询方识别损坏记录。
                         json = "{\"$serializeError\":true}";
                     }
@@ -104,7 +104,7 @@ public static class DefExporter
                     var fieldTexts = new List<string>();
                     bool fieldsCapped = DefFieldExtractor.Extract(def, defId, fieldValueInserts, fieldTexts);
                     if (fieldsCapped)
-                        Log($"字段提取达上限 {typeName}/{def.defName}");
+                        Log($"Field extraction capped {typeName}/{def.defName}");
                     var ftsText = SearchTextBuilder.Build(def.defName, label, description, fieldTexts);
 
                     searchWriter.Write(defId, def.defName ?? "", label, description, ftsText);
@@ -116,21 +116,21 @@ public static class DefExporter
 
                     if (totalDefs % BatchSize == 0)
                     {
-                        Log($"已处理 {totalDefs} 个 Def...");
+                        Log($"Processed {totalDefs} Defs...");
                     }
                 }
 
-                progress?.Invoke(totalDefs, estimatedTotal, $"{typeName}: {totalDefs} / {estimatedTotal}");
+                progress?.Invoke(totalDefs, estimatedTotal);
             }
         }
 
         FieldValueWriter.Flush(conn, fieldValueInserts);
 
         tx.Commit();
-        Log($"已写入 {totalDefs} 个 Def");
+        Log($"Wrote {totalDefs} Defs");
 
         conn.Close();
-        Log($"导出完成: {dbPath} ({new FileInfo(dbPath).Length / 1024 / 1024} MB)");
+        Log($"Export finished: {dbPath} ({new FileInfo(dbPath).Length / 1024 / 1024} MB)");
     }
 
 
