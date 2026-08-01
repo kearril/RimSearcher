@@ -29,6 +29,7 @@ These are the CLI behaviors that guessing wrong wastes turns.
 FTS5 token matching, **not** SQL LIKE. `shield` matches only the standalone token `shield` — it will not match `ShieldBelt` (one token). For Latin/alphanumeric prefix searches, add `*`: `shield*`.
 CJK is auto-bigram (query-side expansion): `护盾` matches `护盾腰带`, and multi-char phrases work as-is too (`粉碎机械族`). Single CJK chars (`闪`) cannot match — the index has no single-char tokens.
 0 hits with a Latin keyword and no `*` prints a stderr hint explaining the prefix-wildcard mechanism (e.g. `shield` → hint suggests `shield*`).
+Search hits every indexed column (def_name, label, description, full_text) — results may be noisy (backstories mentioning the word). To match the def name only, use the `--name-only` filter (FTS column filter; all operators stay in the column).
 
 ### find — value is exact match
 `find <path> <value>` uses `=` equality. `find compClass Shield` matches nothing; you need the full name: `find compClass RimWorld.CompShield`. For partial names, use `search`.

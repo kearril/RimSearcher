@@ -66,6 +66,7 @@ rimsearcher search <keyword> [--type T] [--mod M] [--limit N] [--count]
 | `--mod` | null | Filter by mod_name (exact match) |
 | `--limit` | 20 | Max results |
 | `--count` | false | Return `{"count": N}` instead of result array |
+| `--name-only` | false | Match only the `def_name` column (FTS column filter) — drops noise from description/full_text hits, e.g. `fish* --name-only` excludes backstories that merely mention fish. All query operators stay in the column (`OR` included); CJK queries return nothing (def_names are ASCII) |
 
 **Output** (default): Array of `{def_name, def_type, label, mod_name, package_id, rank}`, sorted by FTS5 rank ascending (lower rank is more relevant).
 

@@ -65,7 +65,7 @@ internal sealed class DefRepository
         return results;
     }
 
-    public long CountSearchResults(string keyword, string? type, string? mod)
+    public long CountSearchResults(string keyword, string? type, string? mod, bool nameOnly)
     {
         using var connection = _connections.Open();
         using var command = connection.CreateCommand();
@@ -79,12 +79,12 @@ internal sealed class DefRepository
             """;
         // 查询侧 CJK 大词展开：MATCH 的空格是 AND 语义，原始整段中文 token
         // 在索引中不存在（写侧只保留原文 token + 二元组），必须替换为二元组。
-        command.Parameters.AddWithValue("@kw", CjkBigramExpander.ExpandForMatch(keyword));
+        command.Parameters.AddWithValue("@kw", BuildMatchExpression(keyword, nameOnly));
         QueryParameters.AddFilters(command, type, mod);
         return (long)command.ExecuteScalar()!;
     }
 
-    public IReadOnlyList<SearchResult> Search(string keyword, string? type, string? mod, int limit)
+    public IReadOnlyList<SearchResult> Search(string keyword, string? type, string? mod, int limit, bool nameOnly)
     {
         using var connection = _connections.Open();
         using var command = connection.CreateCommand();
@@ -98,7 +98,7 @@ internal sealed class DefRepository
             ORDER BY rank
             LIMIT @limit
             """;
-        command.Parameters.AddWithValue("@kw", CjkBigramExpander.ExpandForMatch(keyword));
+        command.Parameters.AddWithValue("@kw", BuildMatchExpression(keyword, nameOnly));
         QueryParameters.AddFilters(command, type, mod);
         command.Parameters.AddWithValue("@limit", limit);
 
@@ -158,6 +158,17 @@ internal sealed class DefRepository
 
     private static string BuildListFilterSql() =>
         "WHERE (@type IS NULL OR d.def_type = @type) AND (@mod IS NULL OR d.mod_name = @mod)";
+
+    /// <summary>
+    /// 构造 MATCH 表达式：--name-only 时限定 def_name 列（FTS 列过滤），
+    /// 括号包装使 OR/AND 的每个子表达式都落在列内（否则右分支会泄漏为全字段匹配）。
+    /// CJK 大词展开在列过滤内同样生效（def_name 虽全英文，保持表达式语义一致）。
+    /// </summary>
+    private static string BuildMatchExpression(string keyword, bool nameOnly)
+    {
+        var expanded = CjkBigramExpander.ExpandForMatch(keyword);
+        return nameOnly ? $"def_name:({expanded})" : expanded;
+    }
 
     public IReadOnlyList<string> FindTypes(string defName)
     {

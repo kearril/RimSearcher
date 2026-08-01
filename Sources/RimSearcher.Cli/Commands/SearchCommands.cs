@@ -9,14 +9,14 @@ internal static class SearchCommands
 {
     public static void Register(ConsoleApp.ConsoleAppBuilder app, DefRepository repository, JsonOutput output)
     {
-        app.Add("search", ([Argument] string keyword, string? type = null, string? mod = null, int limit = 20, bool count = false) =>
+        app.Add("search", ([Argument] string keyword, string? type = null, string? mod = null, int limit = 20, bool count = false, bool nameOnly = false) =>
         {
             if (TypeGuard.RejectUnknown(type, repository))
                 return;
 
             if (count)
             {
-                var countResult = repository.CountSearchResults(keyword, type, mod);
+                var countResult = repository.CountSearchResults(keyword, type, mod, nameOnly);
                 output.Write(new { count = countResult });
                 if (countResult == 0)
                 {
@@ -25,7 +25,7 @@ internal static class SearchCommands
                 }
                 return;
             }
-            var results = repository.Search(keyword, type, mod, limit);
+            var results = repository.Search(keyword, type, mod, limit, nameOnly);
             output.Write(results);
             if (results.Count == 0)
             {
