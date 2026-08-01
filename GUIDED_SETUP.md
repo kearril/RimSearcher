@@ -50,9 +50,6 @@ Create a directory and place `rimsearcher.exe` inside.
 Extract `RimSearcher_DataMod.zip` into RimWorld's `Mods/` folder.
 Tell the user to enable **RimSearcherDataMod** in the in-game Mod list.
 
-> On startup, you may see a `BadImageFormatException` error in red. This is RimWorld mistakenly
-> scanning a native SQLite DLL as a .NET assembly. The exception is caught and ignored — it is harmless.
-
 ### Step 4: Configure CLI
 
 Run this in the directory containing `rimsearcher.exe`:

@@ -55,10 +55,6 @@ CLI 为其提供全文检索——两者相辅相成，一个负责 C#，一个�
 
 进入游戏 → 选项 → Mod 设置 → RimSearcherDataMod → 点击`导出 Def 数据库`。
 
-> 进入游戏主菜单会出现一条 `BadImageFormatException` 红字，来源是 RimWorld 扫描
-> `Assemblies/` 目录时将原生 SQLite DLL 当作 .NET 程序集加载。该异常被捕获忽略，
-> 不影响模组功能，可安全无视。
-
 导出完成后，将生成的 `defs.db` 放到 `rimsearcher.exe` 同目录下。
 
 ### 4. 配置 CLI

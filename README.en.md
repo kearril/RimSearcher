@@ -47,10 +47,6 @@ Extract `RimSearcher_DataMod.zip` into RimWorld's `Mods/` directory. Launch the 
 
 In-game: Options → Mod Settings → RimSearcherDataMod → click **Export Def database**.
 
-> On the main menu you may see a red `BadImageFormatException` line, caused by RimWorld
-> scanning the `Assemblies/` directory and mistaking the native SQLite DLL for a .NET assembly.
-> The exception is caught and ignored — it doesn't affect the mod and can be safely disregarded.
-
 When the export finishes, place the generated `defs.db` in the same directory as `rimsearcher.exe`.
 
 ### 4. Configure the CLI
