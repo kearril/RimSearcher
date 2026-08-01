@@ -34,9 +34,12 @@ CJK is auto-bigram (query-side expansion): `护盾` matches `护盾腰带`, and 
 `find <path> <value>` uses `=` equality. `find compClass Shield` matches nothing; you need the full name: `find compClass RimWorld.CompShield`. For partial names, use `search`.
 Values are case-sensitive and formatted canonically: booleans are lowercase — `find showOnPawns true`, not `True`.
 0 hits → stdout `[]` + stderr hint, **exit code 2** (scripts can distinguish "not found" from failure).
+0 hits on a path containing `.` but no `[i]` also prints a hint: paths match literally as a suffix — nested lists need their index segment (`pawnGroupMakers[0].kindDef` is queryable, `pawnGroupMakers.kindDef` is not).
 
 ### get — multi-type and `--brief`
 A defName can exist in multiple def_types (e.g. `Human` is in BodyDef, ThingDef, HediffGiverSetDef). Without `--type`, the command exits with code 2 and prints candidates — this is NOT a crash, just add `--type` and retry.
+Not found → exit 2 plus a `Did you mean: …` list of similar def_names (same type) and a note that abstract Defs (`Abstract="true"`) are never instantiated and never appear in the database — an abstract name is not a typo, stop looking.
+A misspelled `--type` is rejected up front: `unknown def_type 'X'` on stderr, **exit 1** — run `types` to list valid types.
 `--brief` returns `{classes[]}` — every `*Class`-suffixed string field in the def (thingClass, compClass, workerClass, hediffClass, …), i.e. the C# bridge to the decompiler. Decompile the entries relevant to your question; if none fits, use `fields` and scan `field_path`/`field_value` pairs yourself.
 `--field <path>` extracts a single field (same path format as `fields`: `a.b[0].c`) instead of the full JSON — use it when only one value is needed (saves tokens and parsing); mutually exclusive with `--brief`.
 

@@ -145,6 +145,9 @@ rimsearcher get <defName> [--type T] [--brief] [--field <path>]
 
 **Errors** (--field): malformed path (bad format, e.g. `a[`) → exit 1; valid path with no match (missing property / out-of-range index) → exit 2.
 
+**Not found**: exit 2 with a stderr `Did you mean: …` list of similar def_names (same type, up to 5) plus a note that abstract Defs (`Abstract="true"`) are never instantiated and never appear in the database.
+**Unknown `--type`**: rejected up front — `unknown def_type 'X'` on stderr, exit 1 (run `types` to list valid types). Applies to every command taking `--type`: `search`, `list`, `get`, `find`, `fields`, `values`.
+
 **Multi-type behavior**: If `defName` matches multiple types and `--type` is not specified, the command
 exits with code 2 and prints candidate types to stderr:
 
