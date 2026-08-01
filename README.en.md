@@ -77,7 +77,7 @@ Restart and start testing and using the tool.
 | **rimsearcher Skill** | Download [skills.zip](https://raw.githubusercontent.com/kearril/RimSearcher/master/skills.zip), extract and overwrite the skills directory. Skills are **not published with Releases** — always fetch from the repository, so updates land right after each push |
 | **RimSearcher.DataMod** | Download the new `RimSearcher_DataMod.zip` from [Releases](https://github.com/kearril/RimSearcher/releases/latest) and extract over the Mods directory |
 
-> Skills are important files that shape AI decisions and may be optimized frequently, and updating them never affects CLI or DataMod functionality — so skills don't get a Release on every update. How to tell whether skills have changed? Check the badge at the top of this page ( ![Skills Update Time](https://img.shields.io/endpoint?url=https%3A%2F%2Fkearril.github.io%2FRimSearcher%2Fskills-update.json) ); it shows the last modification time of the whole `skills/` directory in UTC+8. If it's newer than your local files, there's an update.
+> Skills are important files that shape AI decisions and may be optimized frequently, and updating them never affects CLI or DataMod functionality — so skills don't get a Release on every update. How to tell whether skills have changed? Check the badge at the top of this page ( ![Skills Update Time](https://img.shields.io/endpoint?url=https%3A%2F%2Fkearril.github.io%2FRimSearcher%2Fskills-update.json) ); it shows the last modification time of `skills.zip` in UTC+8. If it's newer than your local files, there's an update.
 
 ## Components
 

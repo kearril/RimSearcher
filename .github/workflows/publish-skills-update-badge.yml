@@ -4,7 +4,7 @@ on:
   push:
     branches: [master]
     paths:
-      - "skills/**"
+      - "skills.zip"
       - ".github/workflows/publish-skills-update-badge.yml"
   workflow_dispatch:
 
@@ -33,7 +33,7 @@ jobs:
         shell: bash
         run: |
           mkdir public
-          timestamp="$(git log -1 --format=%cI -- skills)"
+          timestamp="$(git log -1 --format=%cI -- skills.zip)"
           formatted_timestamp="$(TZ=Asia/Shanghai date --date="$timestamp" '+%Y-%m-%d %H:%M UTC+8')"
           jq -n \
             --arg message "$formatted_timestamp" \
