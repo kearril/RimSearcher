@@ -29,7 +29,15 @@ internal sealed record FieldMatch(
 
 internal sealed record FieldValue(
     [property: JsonPropertyName("field_path")] string FieldPath,
-    [property: JsonPropertyName("field_value")] string Value);
+    [property: JsonPropertyName("field_value")] string Value)
+{
+    /// <summary>
+    /// 引用标注：值命中 defs.def_name 时由查询层填充全部命中类型（RimWorld defName 仅类型内唯一，
+    /// 跨类型重名合法且常见），非引用字段不输出（WhenWritingNull）。
+    /// </summary>
+    [property: JsonPropertyName("def_type")]
+    public string[]? DefTypes { get; set; }
+}
 
 /// <summary>
 /// fields 查询结果：可见字段列表 + 是否因 limit 或噪声过滤被截断。

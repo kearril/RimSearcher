@@ -47,10 +47,17 @@ internal static class DefCommands
                 var classNames = new List<string>();
                 CollectClassFields(document.RootElement, classNames);
 
+                var distinctClasses = classNames
+                    .Distinct(StringComparer.Ordinal)
+                    .OrderBy(name => name, StringComparer.Ordinal)
+                    .ToArray();
+                if (distinctClasses.Length == 0)
+                    Console.Error.WriteLine($"Hint: no *Class fields found; try 'fields {defName} --type {type}'");
+
                 output.Write(new BriefDef(
                     source.DefName, source.DefType, source.Label, source.ModName,
                     source.PackageId,
-                    classNames.Distinct(StringComparer.Ordinal).OrderBy(name => name, StringComparer.Ordinal).ToArray()));
+                    distinctClasses));
                 return;
             }
 

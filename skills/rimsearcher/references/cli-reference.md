@@ -125,7 +125,7 @@ rimsearcher get <defName> [--type T] [--brief]
 
 **Output** (default): Full `full_data` JSON object — the complete Def serialization.
 
-**Output** (--brief): `{def_name, def_type, label, mod_name, package_id, classes[]}` — every string field whose name ends in `Class` (thingClass, compClass, workerClass, hediffClass, …), the def's C# bridge clues for feeding the decompiler. Type-agnostic and recursion-deep; entries are deduplicated and sorted.
+**Output** (--brief): `{def_name, def_type, label, mod_name, package_id, classes[]}` — every string field whose name ends in `Class` (thingClass, compClass, workerClass, hediffClass, …), the def's C# bridge clues for feeding the decompiler. Type-agnostic and recursion-deep; entries are deduplicated and sorted. When no `*Class` fields exist, stderr prints `Hint: no *Class fields found; try 'fields <defName> --type <T>'` and `classes[]` stays empty.
 
 **Multi-type behavior**: If `defName` matches multiple types and `--type` is not specified, the command
 exits with code 2 and prints candidate types to stderr:
@@ -193,16 +193,18 @@ rimsearcher fields <defName> --type <T> [--limit N]
 |---|---|---|
 | `defName` | required | Exact def_name |
 | `--type` | required | def_type |
-| `--limit` | 1000 | Max results (fetches 2x internally to compensate for noise filter) |
+| `--limit` | 1000 | Max results (all rows fetched, then filtered/sorted/natural-ordered) |
 
-**Output**: Array of `{field_path, field_value}`.
+**Output**: Array of `{field_path, field_value, def_type?}` — paths in **natural order** (numeric segments by value: `genSteps[2]` before `genSteps[10]`).
+`def_type` is an array of all matching `def_types` and appears only when the value is a reference (matches a `def_name` in the `defs` table); cross-type duplicate names are legal in RimWorld, so all hits are listed (e.g. `"def_type": ["GenStepDef", "ThingDef"]`).
+Note: annotation is by value match only — generic words that happen to share a `def_name` (`None`, `Normal`, …) may be annotated too; treat `def_type` as a hint and confirm with `get` when the field's semantics are unclear.
 
 **Noise filtering**: The following are excluded:
 - Fields matching: `debugRandomId`, `defNameHash`, `generated`, `ignoreConfigErrors`, `ignoreIllegalLabelCharacterConfigError`, `index`, `shortHash`
 - Fields with path prefix `modContentPack.`
 
-**Truncation**: when `--limit` or the internal fetch window (`limit*2`, cap 40000) is reached, stderr prints
-`Hint: reached limit N; results may be truncated, use --limit to increase`; detection uses an exact COUNT, no false positives.
+**Truncation**: when the visible count exceeds `--limit`, stderr prints
+`Hint: reached limit N; results may be truncated, use --limit to increase` (exact detection, no false positives).
 
 **Examples**:
 ```bash

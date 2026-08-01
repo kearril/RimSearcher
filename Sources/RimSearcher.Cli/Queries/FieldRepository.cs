@@ -51,70 +51,65 @@ internal sealed class FieldRepository
     {
         using var connection = _connections.Open();
 
-        var results = new List<FieldValue>();
+        var visible = new List<FieldValue>();
         using (var command = connection.CreateCommand())
         {
-            // 取 2x 行窗口补偿噪声过滤消耗；上限 40000 = DataMod 单 Def 上限 20000 的 2 倍。
-            int sqlLimit = Math.Min(limit * 2, 40000);
+            // 全量取回后在应用层过滤与排序：SQL 取行窗口会与自然排序冲突（字典序窗口 ≠ 自然序窗口）。
             command.CommandText = """
                 SELECT fv.field_path, fv.field_value
                 FROM field_values fv
                 JOIN defs d ON fv.def_id = d.id
                 WHERE d.def_name = @name AND d.def_type = @type
-                ORDER BY fv.field_path
-                LIMIT @limit
                 """;
             command.Parameters.AddWithValue("@name", defName);
             command.Parameters.AddWithValue("@type", type);
-            command.Parameters.AddWithValue("@limit", sqlLimit);
 
             using var reader = command.ExecuteReader();
             while (reader.Read())
             {
-                if (results.Count >= limit)
-                    break;
                 var path = reader.GetString(0);
                 if (IsNoiseField(path))
                     continue;
-                results.Add(new FieldValue(path, reader.GetString(1)));
+                visible.Add(new FieldValue(path, reader.GetString(1)));
             }
         }
 
-        // 精确截断检测：以过滤后的可见行总数与返回数比较。
-        // 噪声行可能吃光 SQL 取行窗口，"多读一行"或"行数==limit"都会漏报或误报。
-        bool isTruncated = CountVisibleRows(connection, defName, type) > results.Count;
+        AnnotateReferences(connection, visible);
+
+        bool isTruncated = visible.Count > limit;
+        var results = visible
+            .OrderBy(v => v.FieldPath, NaturalPathComparer.Instance)
+            .Take(limit)
+            .ToList();
         return new FieldListResult(results, isTruncated);
     }
 
-    private long CountVisibleRows(SqliteConnection connection, string defName, string type)
-    {
-        using var command = connection.CreateCommand();
-        command.CommandText = $"""
-            SELECT COUNT(*)
-            FROM field_values fv
-            JOIN defs d ON fv.def_id = d.id
-            WHERE d.def_name = @name AND d.def_type = @type
-              AND {BuildNoiseFilterSql()}
-            """;
-        command.Parameters.AddWithValue("@name", defName);
-        command.Parameters.AddWithValue("@type", type);
-        return (long)command.ExecuteScalar()!;
-    }
-
     /// <summary>
-    /// 与 <see cref="IsNoiseField"/> 同语义的 SQL 过滤条件（末段匹配）。
-    /// 注意：名单与 DataMod 的 DefFieldExtractor.SkipFieldNames 内容一致，修改时必须同步两侧。
+    /// 引用字段标注：值命中 defs.def_name 时带出其全部 def_type，供 agent 判断引用目标类型。
+    /// defName 仅类型内唯一，跨类型重名合法——故保留所有命中类型而非取其一。
     /// </summary>
-    private static string BuildNoiseFilterSql()
+    private static void AnnotateReferences(SqliteConnection connection, List<FieldValue> values)
     {
-        var conditions = new List<string>
+        var lookup = new Dictionary<string, List<string>>(StringComparer.Ordinal);
+        using (var command = connection.CreateCommand())
         {
-            "fv.field_path NOT GLOB 'modContentPack.*'",
-            "fv.field_path NOT GLOB '*.modContentPack.*'"
-        };
-        foreach (var name in NoiseFieldNames)
-            conditions.Add($"fv.field_path NOT LIKE '%.{name}'");
-        return string.Join(" AND ", conditions);
+            command.CommandText = "SELECT def_name, def_type FROM defs";
+            using var reader = command.ExecuteReader();
+            while (reader.Read())
+            {
+                var name = reader.GetString(0);
+                var type = reader.GetString(1);
+                if (!lookup.TryGetValue(name, out var types))
+                    lookup[name] = types = new List<string>();
+                types.Add(type);
+            }
+        }
+
+        foreach (var value in values)
+        {
+            if (lookup.TryGetValue(value.Value, out var types))
+                value.DefTypes = types.Distinct(StringComparer.Ordinal).OrderBy(t => t, StringComparer.Ordinal).ToArray();
+        }
     }
 
     public IReadOnlyList<string> GetValues(string fieldPath, int limit)
