@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Reflection;
 using RimSearcher.DataMod.Export;
 using RimSearcher.DataMod.Reflection;
 using RimSearcher.DataMod.Search;
@@ -138,6 +139,14 @@ public static class DefExporter
         // 数据全部写入后统一构建索引（先插后建）。
         ExportSchema.CreateIndexes(conn);
 
+        // 版本标记（事务内，导出失败回滚不留半成品标记）：CLI 以此认证库的产出版本。
+        using (var versionCommand = conn.CreateCommand())
+        {
+            versionCommand.CommandText = "PRAGMA user_version = @v";
+            versionCommand.Parameters.AddWithValue("@v", EncodeVersion(Assembly.GetExecutingAssembly().GetName().Version));
+            versionCommand.ExecuteNonQuery();
+        }
+
         tx.Commit();
         Log($"Wrote {totalDefs} Defs");
 
@@ -145,6 +154,13 @@ public static class DefExporter
         Log($"Export finished: {dbPath} ({new FileInfo(dbPath).Length / 1024 / 1024} MB)");
     }
 
+
+    /// <summary>
+    /// 版本号编码为 user_version 整数（major*10000+minor*100+patch，patch ≤ 99）；
+    /// 与 CLI 的 DatabaseConnectionFactory.EncodeVersion 算法一致，修改时必须同步两侧。
+    /// </summary>
+    private static int EncodeVersion(Version version) =>
+        version.Major * 10000 + version.Minor * 100 + version.Build;
 
     private static int CountDefs(IEnumerable<Type> defTypes)
     {

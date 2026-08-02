@@ -36,6 +36,7 @@ Export content reflects runtime state; the following limits are by design:
 | Depth | `full_data` hard-capped at 100 (`"$truncated"` beyond; real data reaches 29, never triggered); `field_values` retrieval depth 4 — paths like `stages[0].statOffsets[0].value` are reachable; think-tree nodes below level 3: use `get` to read `full_data` |
 | Numeric format | float/double use G7/G15 significant digits (extreme-precision truncation is a known feature); `NaN`/`±Infinity` are quoted strings; bools are lowercase `true`/`false`; `find` value matching and `values` path matching are case-sensitive (`find` path matching goes through LIKE and is case-insensitive for ASCII) |
 | Path matching | `find`/`values` `fieldPath` matches literally as a suffix (`%`/`_` are escaped, not wildcards) |
+| Version lock | defs.db carries the exporting DataMod's version in the SQLite `user_version` header field (encoded `major*10000+minor*100+patch`). The CLI accepts only a database exported by the exact same version and fails all data commands otherwise (exit 1 with both versions in the message). Databases without a marker (pre-3.1.2 exports) are rejected too — re-export with the current DataMod. `install`/`update` are exempt (they don't open the database) |
 | Null values | Null fields live in a separate table pair (`null_fields` + `field_paths` path dictionary), present only in databases exported by the current DataMod. CLI and DataMod are version-locked: an older database fails these queries with an explicit re-export error. Empty strings and null list/dictionary items are not indexed. `find <path> null` (value must be lowercase) enumerates Defs whose field exists and is null, plus any literal string `"null"` values; a missing field produces no row, so "field absent" cannot be queried |
 
 ---
@@ -45,7 +46,7 @@ Export content reflects runtime state; the following limits are by design:
 | Code | Meaning |
 |---|---|
 | 0 | Success |
-| 1 | Runtime or query failure (message on stderr); **unknown command** (usage on stderr) |
+| 1 | Runtime or query failure (message on stderr); **unknown command** (usage on stderr); **database version mismatch** (defs.db must be exported by the same-version DataMod — CLI and DataMod are version-locked; re-export to fix) |
 | 2 | Query found nothing or was ambiguous: `get` not-found / multi-type without `--type` / `--field` not found; `find`/`search`/`fields`/`values` 0 hits (stdout stays `[]` or `{"count": 0}`) |
 
 Exception: `list` keeps exit 0 on an empty page (pagination semantics — an out-of-range offset is a normal state, not a miss).
