@@ -45,6 +45,7 @@ public static class DefExporter
         var fieldValueInserts = new List<(int DefId, string FieldPath, string FieldValue)>();
         var nullInserts = new List<(int DefId, string FieldPath)>();
         var pathIds = new Dictionary<string, int>();
+        var seenDefKeys = new HashSet<(string DefName, string DefType)>();
 
         using var tx = conn.BeginTransaction();
 
@@ -68,8 +69,19 @@ public static class DefExporter
 
                 foreach (var def in defs)
                 {
-                    defId++;
                     totalDefs++;
+
+                    // 重复 (def_name, def_type) 保留首现：mod 直接 append AllDefsListForReading 或运行时改名
+                    // 会制造重复对，否则 UNIQUE 索引构建时中止导出（与 SQLite UNIQUE 的 BINARY 比较一致）。
+                    string defName = def.defName ?? "";
+                    if (!seenDefKeys.Add((defName, typeName)))
+                    {
+                        Log($"Skipping duplicate {typeName}/{defName} from {def.modContentPack?.Name ?? "Unknown"}; keeping earlier occurrence");
+                        // 进度按枚举总数（含重复）推进：跳过项也需回调，否则尾部重复会让进度停在不满。
+                        progress?.Invoke(totalDefs, estimatedTotal);
+                        continue;
+                    }
+                    defId++;
 
                     string json;
                     try
@@ -95,7 +107,7 @@ public static class DefExporter
 
                     defWriter.Write(
                         defId,
-                        def.defName ?? "",
+                        defName,
                         typeName,
                         label,
                         description,
@@ -108,9 +120,9 @@ public static class DefExporter
                     bool fieldsCapped = DefFieldExtractor.Extract(def, defId, fieldValueInserts, nullInserts, fieldTexts);
                     if (fieldsCapped)
                         Log($"Field extraction capped {typeName}/{def.defName}");
-                    var ftsText = SearchTextBuilder.Build(def.defName, label, description, fieldTexts);
+                    var ftsText = SearchTextBuilder.Build(defName, label, description, fieldTexts);
 
-                    searchWriter.Write(defId, def.defName ?? "", label, description, ftsText);
+                    searchWriter.Write(defId, defName, label, description, ftsText);
 
                     if (fieldValueInserts.Count >= BatchSize)
                     {
