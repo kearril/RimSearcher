@@ -17,7 +17,7 @@ internal sealed class FieldRepository
 
     public IReadOnlyList<FieldMatch> Find(string fieldPath, string value, string? type, string? mod, int limit)
     {
-        // null 查询走独立表（空字段不是值）：新导出库才有效，缺表时退化为普通路径 0 命中。
+        // null 查询走独立表（空字段不是值）；CLI 与 DataMod 捆绑发布，只兼容新导出库。
         if (string.Equals(value, "null", StringComparison.Ordinal))
             return FindNull(fieldPath, type, mod, limit);
 
@@ -52,15 +52,12 @@ internal sealed class FieldRepository
     }
 
     /// <summary>
-    /// null 查询：null_fields 表（新导出库的空字段）∪ field_values 中真实值为 "null" 字符串的行。
-    /// 两个来源均按后缀匹配；旧库（无 null 表）时返回空，命令层给出重导提示。
+    /// null 查询：null_fields 表（空字段）∪ field_values 中真实值为 "null" 字符串的行。
+    /// 两个来源均按后缀匹配；要求新导出库（无 null 表时 SQLite 直接报错，版本捆绑不降级）。
     /// </summary>
     private IReadOnlyList<FieldMatch> FindNull(string fieldPath, string? type, string? mod, int limit)
     {
         using var connection = _connections.Open();
-        if (!HasNullTables(connection))
-            return Array.Empty<FieldMatch>();
-
         using var command = connection.CreateCommand();
         command.CommandText = """
             SELECT d.def_name, d.def_type, d.label, d.mod_name, d.package_id, x.path, 'null'
@@ -97,16 +94,6 @@ internal sealed class FieldRepository
         return results;
     }
 
-    /// <summary>
-    /// null 表存在性探测：新导出库才建 field_paths/null_fields，旧库查询应友好降级而非报错。
-    /// </summary>
-    private static bool HasNullTables(SqliteConnection connection)
-    {
-        using var command = connection.CreateCommand();
-        command.CommandText = "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name IN ('field_paths','null_fields')";
-        return Convert.ToInt64(command.ExecuteScalar()) == 2;
-    }
-
     public FieldListResult GetFields(string defName, string type, int limit, string? filter)
     {
         using var connection = _connections.Open();
@@ -115,29 +102,21 @@ internal sealed class FieldRepository
         using (var command = connection.CreateCommand())
         {
             // 全量取回后在应用层过滤与排序：SQL 取行窗口会与自然排序冲突（字典序窗口 ≠ 自然序窗口）。
-            // 新库（含 null 表）时 UNION ALL 空字段行：与值行同源返回，共同走噪声过滤/自然排序/--limit。
-            command.CommandText = HasNullTables(connection)
-                ? """
-                    SELECT fv.field_path, fv.field_value
-                    FROM field_values fv
-                    JOIN defs d ON fv.def_id = d.id
-                    WHERE d.def_name = @name AND d.def_type = @type
-                      AND (@filter IS NULL OR fv.field_path LIKE @pattern ESCAPE '\')
-                    UNION ALL
-                    SELECT fp.path, 'null'
-                    FROM field_paths fp
-                    JOIN null_fields nf ON nf.path_id = fp.id
-                    JOIN defs d ON d.id = nf.def_id
-                    WHERE d.def_name = @name AND d.def_type = @type
-                      AND (@filter IS NULL OR fp.path LIKE @pattern ESCAPE '\')
-                    """
-                : """
-                    SELECT fv.field_path, fv.field_value
-                    FROM field_values fv
-                    JOIN defs d ON fv.def_id = d.id
-                    WHERE d.def_name = @name AND d.def_type = @type
-                      AND (@filter IS NULL OR fv.field_path LIKE @pattern ESCAPE '\')
-                    """;
+            // UNION ALL 空字段行：与值行同源返回，共同走噪声过滤/自然排序/--limit。
+            command.CommandText = """
+                SELECT fv.field_path, fv.field_value
+                FROM field_values fv
+                JOIN defs d ON fv.def_id = d.id
+                WHERE d.def_name = @name AND d.def_type = @type
+                  AND (@filter IS NULL OR fv.field_path LIKE @pattern ESCAPE '\')
+                UNION ALL
+                SELECT fp.path, 'null'
+                FROM field_paths fp
+                JOIN null_fields nf ON nf.path_id = fp.id
+                JOIN defs d ON d.id = nf.def_id
+                WHERE d.def_name = @name AND d.def_type = @type
+                  AND (@filter IS NULL OR fp.path LIKE @pattern ESCAPE '\')
+                """;
             command.Parameters.AddWithValue("@name", defName);
             command.Parameters.AddWithValue("@type", type);
             // 空 glob 归一为 null：LIKE '' 匹配空串（等价于 0 命中），而"不传"应匹配全部。
@@ -220,35 +199,25 @@ internal sealed class FieldRepository
         // BINARY 比较大小写敏感，与文档声明一致。
         // field_path_rev 列由 DataMod 导出（捆绑发布必含）。
         var reversed = ReversePath(fieldPath);
-        // 新库（含 null 表）时 UNION 空字段标记："null" 与其他值一同排序、同受 LIMIT 约束。
-        command.CommandText = HasNullTables(connection)
-            ? """
-                SELECT v FROM (
-                    SELECT DISTINCT fv.field_value AS v
-                    FROM field_values fv
-                    JOIN defs d ON fv.def_id = d.id
-                    WHERE fv.field_path_rev >= @low AND fv.field_path_rev < @high
-                      AND (@type IS NULL OR d.def_type = @type)
-                    UNION
-                    SELECT 'null' AS v
-                    WHERE EXISTS (
-                        SELECT 1 FROM null_fields nf
-                        JOIN field_paths fp ON fp.id = nf.path_id
-                        JOIN defs d ON d.id = nf.def_id
-                        WHERE fp.path LIKE '%' || @path ESCAPE '\'
-                          AND (@type IS NULL OR d.def_type = @type)
-                    )
-                ) ORDER BY v LIMIT @limit
-                """
-            : """
-                SELECT DISTINCT fv.field_value
+        // UNION 空字段标记："null" 与其他值一同排序、同受 LIMIT 约束。
+        command.CommandText = """
+            SELECT v FROM (
+                SELECT DISTINCT fv.field_value AS v
                 FROM field_values fv
                 JOIN defs d ON fv.def_id = d.id
                 WHERE fv.field_path_rev >= @low AND fv.field_path_rev < @high
                   AND (@type IS NULL OR d.def_type = @type)
-                ORDER BY fv.field_value
-                LIMIT @limit
-                """;
+                UNION
+                SELECT 'null' AS v
+                WHERE EXISTS (
+                    SELECT 1 FROM null_fields nf
+                    JOIN field_paths fp ON fp.id = nf.path_id
+                    JOIN defs d ON d.id = nf.def_id
+                    WHERE fp.path LIKE '%' || @path ESCAPE '\'
+                      AND (@type IS NULL OR d.def_type = @type)
+                )
+            ) ORDER BY v LIMIT @limit
+            """;
         command.Parameters.AddWithValue("@low", reversed);
         command.Parameters.AddWithValue("@high", NextBoundary(reversed));
         command.Parameters.AddWithValue("@path", EscapeLikePattern(fieldPath));

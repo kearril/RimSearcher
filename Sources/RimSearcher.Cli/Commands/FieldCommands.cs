@@ -18,9 +18,9 @@ internal static class FieldCommands
             output.Write(results);
             if (results.Count == 0)
             {
-                // null 查询的 0 命中通常是旧库（无 null 表）：提示重导比模糊搜索建议更准确。
+                // null 查询 0 命中 = 该路径确实无空字段（旧库缺表由全局过滤器报错，版本捆绑不降级）。
                 Console.Error.WriteLine(value == "null"
-                    ? "Hint: no null-field matches. Re-export with the current DataMod to enable null queries (older databases have no null rows)"
+                    ? "Hint: no null-field matches for this path suffix"
                     : $"Hint: no exact matches. Try fuzzy search: rimsearcher search \"{value}\"");
                 if (fieldPath.Contains('.') && !fieldPath.Contains('['))
                     Console.Error.WriteLine(

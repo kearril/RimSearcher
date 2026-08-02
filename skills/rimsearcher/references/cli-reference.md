@@ -36,7 +36,7 @@ Export content reflects runtime state; the following limits are by design:
 | Depth | `full_data` hard-capped at 100 (`"$truncated"` beyond; real data reaches 29, never triggered); `field_values` retrieval depth 4 — paths like `stages[0].statOffsets[0].value` are reachable; think-tree nodes below level 3: use `get` to read `full_data` |
 | Numeric format | float/double use G7/G15 significant digits (extreme-precision truncation is a known feature); `NaN`/`±Infinity` are quoted strings; bools are lowercase `true`/`false`; `find` value matching and `values` path matching are case-sensitive (`find` path matching goes through LIKE and is case-insensitive for ASCII) |
 | Path matching | `find`/`values` `fieldPath` matches literally as a suffix (`%`/`_` are escaped, not wildcards) |
-| Null values | Null fields live in a separate table pair (`null_fields` + `field_paths` path dictionary) — present only in databases exported by the current DataMod (older databases lack them and null queries return empty with a re-export hint). Empty strings and null list/dictionary items are not indexed. `find <path> null` (value must be lowercase) enumerates Defs whose field exists and is null, plus any literal string `"null"` values; a missing field produces no row, so "field absent" cannot be queried |
+| Null values | Null fields live in a separate table pair (`null_fields` + `field_paths` path dictionary), present only in databases exported by the current DataMod. CLI and DataMod are version-locked: an older database fails these queries with an explicit re-export error. Empty strings and null list/dictionary items are not indexed. `find <path> null` (value must be lowercase) enumerates Defs whose field exists and is null, plus any literal string `"null"` values; a missing field produces no row, so "field absent" cannot be queried |
 
 ---
 
@@ -203,7 +203,7 @@ rimsearcher find <fieldPath> <value> [--type T] [--mod M] [--limit N]
 
 **0 results**: A hint is written to stderr suggesting `rimsearcher search "value"`.
 
-**Null values**: `find <path> null` (lowercase literal) matches Defs whose field exists and is null — the complement of a normal `values` listing — plus any literal string `"null"` values. Requires a current-export database; older databases return empty with a re-export hint. Empty strings and missing fields have no rows and cannot be matched.
+**Null values**: `find <path> null` (lowercase literal) matches Defs whose field exists and is null — the complement of a normal `values` listing — plus any literal string `"null"` values. Requires a current-export database; older databases fail with an explicit re-export error (CLI/DataMod are version-locked). Empty strings and missing fields have no rows and cannot be matched.
 
 **Key distinction**:
 - `find` = **exact** field value match. Requires full name: `RimWorld.CompShield`

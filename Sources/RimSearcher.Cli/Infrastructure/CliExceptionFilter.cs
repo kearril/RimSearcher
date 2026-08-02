@@ -42,9 +42,13 @@ internal sealed class CliExceptionFilter(ConsoleAppFilter next) : ConsoleAppFilt
     {
         switch (exception.SqliteErrorCode)
         {
-            // 查询 SQL 均为固定模板，唯一接受用户输入的是 FTS MATCH 表达式，
-            // 因此执行期的 SQLITE_ERROR 均视为 FTS 语法错误——按错误码分类，
-            // 不依赖随 SQLite 版本变动的消息文案。
+            // 固定 SQL 的 SQLITE_ERROR 有两类来源：FTS MATCH 用户表达式、
+            // null 查询引用独立表（CLI 与 DataMod 捆绑发布，旧库缺表属预期）。
+            // "no such table" 是 SQLite 稳定文案，据此区分缺表（重导指引）与 FTS 语法错误。
+            case SqliteError when exception.Message.Contains("no such table", StringComparison.Ordinal):
+                Console.Error.WriteLine(
+                    $"Database error: {exception.Message} Re-export defs.db with the current DataMod (CLI and DataMod are version-locked)");
+                break;
             case SqliteError:
                 Console.Error.WriteLine($"FTS query syntax error: {exception.Message}");
                 Console.Error.WriteLine(
