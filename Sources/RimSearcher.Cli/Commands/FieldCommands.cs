@@ -18,7 +18,10 @@ internal static class FieldCommands
             output.Write(results);
             if (results.Count == 0)
             {
-                Console.Error.WriteLine($"Hint: no exact matches. Try fuzzy search: rimsearcher search \"{value}\"");
+                // null 查询的 0 命中通常是旧库（无 null 表）：提示重导比模糊搜索建议更准确。
+                Console.Error.WriteLine(value == "null"
+                    ? "Hint: no null-field matches. Re-export with the current DataMod to enable null queries (older databases have no null rows)"
+                    : $"Hint: no exact matches. Try fuzzy search: rimsearcher search \"{value}\"");
                 if (fieldPath.Contains('.') && !fieldPath.Contains('['))
                     Console.Error.WriteLine(
                         "Hint: field paths match literally as a suffix — nested list paths need their index segment " +

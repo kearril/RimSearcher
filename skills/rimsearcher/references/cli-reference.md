@@ -13,6 +13,8 @@ defs:        id, def_name, def_type, label, description, mod_name, package_id, s
 field_values: def_id, field_path, field_path_rev, field_value
        field_path_rev is the character-reversed path — it backs the `values` suffix index
        (values queries match case-sensitively on it)
+field_paths:  id, path          — path dictionary for null fields (current exports)
+null_fields:  def_id, path_id   — Defs whose field exists and is null (current exports)
 defs_fts:    FTS5( def_name, label, description, full_text )  — tokenize='unicode61'
 ```
 
@@ -34,7 +36,7 @@ Export content reflects runtime state; the following limits are by design:
 | Depth | `full_data` hard-capped at 100 (`"$truncated"` beyond; real data reaches 29, never triggered); `field_values` retrieval depth 4 — paths like `stages[0].statOffsets[0].value` are reachable; think-tree nodes below level 3: use `get` to read `full_data` |
 | Numeric format | float/double use G7/G15 significant digits (extreme-precision truncation is a known feature); `NaN`/`±Infinity` are quoted strings; bools are lowercase `true`/`false`; `find` value matching and `values` path matching are case-sensitive (`find` path matching goes through LIKE and is case-insensitive for ASCII) |
 | Path matching | `find`/`values` `fieldPath` matches literally as a suffix (`%`/`_` are escaped, not wildcards) |
-| Null values | A field whose value is `null` is indexed with the literal value `"null"` — rows exist only in fresh exports (older databases have no null rows; re-export with the current DataMod to get them). Empty strings and null list/dictionary items are not indexed. `find <path> null` enumerates Defs whose field is null (value must be lowercase); a missing field produces no row, so "field absent" cannot be queried |
+| Null values | Null fields live in a separate table pair (`null_fields` + `field_paths` path dictionary) — present only in databases exported by the current DataMod (older databases lack them and null queries return empty with a re-export hint). Empty strings and null list/dictionary items are not indexed. `find <path> null` (value must be lowercase) enumerates Defs whose field exists and is null, plus any literal string `"null"` values; a missing field produces no row, so "field absent" cannot be queried |
 
 ---
 
@@ -201,7 +203,7 @@ rimsearcher find <fieldPath> <value> [--type T] [--mod M] [--limit N]
 
 **0 results**: A hint is written to stderr suggesting `rimsearcher search "value"`.
 
-**Null values**: `find <path> null` (lowercase literal) matches Defs whose field exists and is null — the complement of a normal `values` listing. Empty strings and missing fields have no rows and cannot be matched.
+**Null values**: `find <path> null` (lowercase literal) matches Defs whose field exists and is null — the complement of a normal `values` listing — plus any literal string `"null"` values. Requires a current-export database; older databases return empty with a re-export hint. Empty strings and missing fields have no rows and cannot be matched.
 
 **Key distinction**:
 - `find` = **exact** field value match. Requires full name: `RimWorld.CompShield`
@@ -264,7 +266,7 @@ rimsearcher values <fieldPath> [--limit N]
 | `--type` | null | Filter by def_type |
 | `--limit` | 200 | Max distinct values |
 
-**Output**: String array of distinct field values. When any Def's field is null, the literal `"null"` appears among the values (fresh exports only) — e.g. `values armorCategory --type DamageDef` returns `["Blunt","Heat","Sharp","null"]` on a current export.
+**Output**: String array of distinct field values. When any Def's field is null, `"null"` appears among the values (current exports only) — e.g. `values armorCategory --type DamageDef` returns `["Blunt","Heat","Sharp","null"]`. On older databases `"null"` appears only if the value was stored literally.
 
 **0 hits**: stdout stays `[]` and the process exits with code 2.
 

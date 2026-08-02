@@ -42,6 +42,8 @@ public static class DefExporter
         int totalDefs = 0;
         int defId = 0;
         var fieldValueInserts = new List<(int DefId, string FieldPath, string FieldValue)>();
+        var nullInserts = new List<(int DefId, string FieldPath)>();
+        var pathIds = new Dictionary<string, int>();
 
         using var tx = conn.BeginTransaction();
 
@@ -102,7 +104,7 @@ public static class DefExporter
                         json);
 
                     var fieldTexts = new List<string>();
-                    bool fieldsCapped = DefFieldExtractor.Extract(def, defId, fieldValueInserts, fieldTexts);
+                    bool fieldsCapped = DefFieldExtractor.Extract(def, defId, fieldValueInserts, nullInserts, fieldTexts);
                     if (fieldsCapped)
                         Log($"Field extraction capped {typeName}/{def.defName}");
                     var ftsText = SearchTextBuilder.Build(def.defName, label, description, fieldTexts);
@@ -112,6 +114,11 @@ public static class DefExporter
                     if (fieldValueInserts.Count >= BatchSize)
                     {
                         FieldValueWriter.Flush(conn, fieldValueInserts);
+                    }
+
+                    if (nullInserts.Count >= BatchSize)
+                    {
+                        NullFieldWriter.Flush(conn, pathIds, nullInserts);
                     }
 
                     if (totalDefs % BatchSize == 0)
@@ -126,6 +133,7 @@ public static class DefExporter
         }
 
         FieldValueWriter.Flush(conn, fieldValueInserts);
+        NullFieldWriter.Flush(conn, pathIds, nullInserts);
 
         // 数据全部写入后统一构建索引（先插后建）。
         ExportSchema.CreateIndexes(conn);

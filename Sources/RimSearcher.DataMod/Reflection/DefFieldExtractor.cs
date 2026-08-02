@@ -33,18 +33,20 @@ internal static class DefFieldExtractor
     };
 
     /// <summary>
-    /// 提取指定 Def 的全部字段值：写入 inserts 供入库，同时收集到 allTexts 供 FTS 文本构建。
+    /// 提取指定 Def 的全部字段值：写入 inserts 供入库，null 字段收集到 nullInserts（独立表，避免路径重复存储），
+    /// 同时收集到 allTexts 供 FTS 文本构建。
     /// 返回是否达单 Def 上限（true = 仍有字段未提取，导出方应记录日志）。
     /// </summary>
     public static bool Extract(
         Def def,
         int defId,
         List<(int DefId, string FieldPath, string FieldValue)> inserts,
+        List<(int DefId, string FieldPath)> nullInserts,
         List<string> allTexts)
     {
         var visited = new HashSet<object>();
         int count = 0;
-        ExtractRecursive(def, defId, string.Empty, inserts, allTexts, visited, 0, ref count);
+        ExtractRecursive(def, defId, string.Empty, inserts, nullInserts, allTexts, visited, 0, ref count);
         return count >= MaxValuesPerDef;
     }
 
@@ -53,6 +55,7 @@ internal static class DefFieldExtractor
         int defId,
         string pathPrefix,
         List<(int DefId, string FieldPath, string FieldValue)> inserts,
+        List<(int DefId, string FieldPath)> nullInserts,
         List<string> allTexts,
         HashSet<object> visited,
         int depth,
@@ -77,20 +80,20 @@ internal static class DefFieldExtractor
         {
             if (value is IList list)
             {
-                ExtractList(list, defId, pathPrefix, inserts, allTexts, visited, depth, ref count);
+                ExtractList(list, defId, pathPrefix, inserts, nullInserts, allTexts, visited, depth, ref count);
                 return;
             }
 
             if (value is IDictionary dictionary)
             {
-                ExtractDictionary(dictionary, defId, pathPrefix, inserts, allTexts, visited, depth, ref count);
+                ExtractDictionary(dictionary, defId, pathPrefix, inserts, nullInserts, allTexts, visited, depth, ref count);
                 return;
             }
 
             if (ReflectionTraversalPolicy.IsExcludedType(type))
                 return;
 
-            ExtractObjectFields(value, type, defId, pathPrefix, inserts, allTexts, visited, depth, ref count);
+            ExtractObjectFields(value, type, defId, pathPrefix, inserts, nullInserts, allTexts, visited, depth, ref count);
         }
         finally
         {
@@ -104,6 +107,7 @@ internal static class DefFieldExtractor
         int defId,
         string pathPrefix,
         List<(int DefId, string FieldPath, string FieldValue)> inserts,
+        List<(int DefId, string FieldPath)> nullInserts,
         List<string> allTexts,
         HashSet<object> visited,
         int depth,
@@ -140,7 +144,7 @@ internal static class DefFieldExtractor
             }
             else if (item != null && item.GetType().IsClass)
             {
-                ExtractRecursive(item, defId, itemPath, inserts, allTexts, visited, depth + 1, ref count);
+                ExtractRecursive(item, defId, itemPath, inserts, nullInserts, allTexts, visited, depth + 1, ref count);
             }
         }
     }
@@ -150,6 +154,7 @@ internal static class DefFieldExtractor
         int defId,
         string pathPrefix,
         List<(int DefId, string FieldPath, string FieldValue)> inserts,
+        List<(int DefId, string FieldPath)> nullInserts,
         List<string> allTexts,
         HashSet<object> visited,
         int depth,
@@ -189,7 +194,7 @@ internal static class DefFieldExtractor
             }
             else if (entry.Value != null && entry.Value.GetType().IsClass)
             {
-                ExtractRecursive(entry.Value, defId, entryPath, inserts, allTexts, visited, depth + 1, ref count);
+                ExtractRecursive(entry.Value, defId, entryPath, inserts, nullInserts, allTexts, visited, depth + 1, ref count);
             }
         }
     }
@@ -200,6 +205,7 @@ internal static class DefFieldExtractor
         int defId,
         string pathPrefix,
         List<(int DefId, string FieldPath, string FieldValue)> inserts,
+        List<(int DefId, string FieldPath)> nullInserts,
         List<string> allTexts,
         HashSet<object> visited,
         int depth,
@@ -222,9 +228,10 @@ internal static class DefFieldExtractor
 
             if (fieldValue == null)
             {
-                // null 字段落字面量 "null" 标记行：支撑 find/values 的空字段（补集）查询。
-                // 不写 allTexts——FTS 全文若收录 null 标记，search "null" 会命中所有含空字段的 Def。
-                if (!AddNullMarker(defId, fieldPath, inserts, ref count))
+                // null 字段收集到独立集合：支撑 find/values 的空字段（补集）查询。
+                // 不走 inserts 也不走 allTexts——空字段不是值：复用值通道会重复存储路径文本（体积翻倍），
+                // 且 FTS 全文若收录 null 标记，search "null" 会命中所有含空字段的 Def。
+                if (!AddNullMarker(defId, fieldPath, nullInserts, ref count))
                     return;
                 continue;
             }
@@ -253,7 +260,7 @@ internal static class DefFieldExtractor
             }
             else
             {
-                ExtractRecursive(fieldValue, defId, fieldPath, inserts, allTexts, visited, depth + 1, ref count);
+                ExtractRecursive(fieldValue, defId, fieldPath, inserts, nullInserts, allTexts, visited, depth + 1, ref count);
             }
         }
     }
@@ -299,13 +306,13 @@ internal static class DefFieldExtractor
     }
 
     /// <summary>
-    /// null 字段的标记行：值恒为字面量 "null"，与普通值共用同一张表同一查询面（find/values 直接可用）。
-    /// 过滤规则与 <see cref="TryAddValue"/> 一致（count 上限、噪声字段），仅不写 allTexts。
+    /// 收集 null 字段的 (defId, path) 对：路径由导出方去重注册进 field_paths 字典后写 null_fields。
+    /// 过滤规则与 <see cref="TryAddValue"/> 一致（count 上限、噪声字段）。
     /// </summary>
     private static bool AddNullMarker(
         int defId,
         string fieldPath,
-        List<(int DefId, string FieldPath, string FieldValue)> inserts,
+        List<(int DefId, string FieldPath)> nullInserts,
         ref int count)
     {
         if (count >= MaxValuesPerDef)
@@ -319,7 +326,7 @@ internal static class DefFieldExtractor
                 return true;
         }
 
-        inserts.Add((defId, fieldPath, "null"));
+        nullInserts.Add((defId, fieldPath));
         count++;
         return true;
     }
