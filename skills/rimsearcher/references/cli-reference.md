@@ -34,6 +34,7 @@ Export content reflects runtime state; the following limits are by design:
 | Depth | `full_data` hard-capped at 100 (`"$truncated"` beyond; real data reaches 29, never triggered); `field_values` retrieval depth 4 — paths like `stages[0].statOffsets[0].value` are reachable; think-tree nodes below level 3: use `get` to read `full_data` |
 | Numeric format | float/double use G7/G15 significant digits (extreme-precision truncation is a known feature); `NaN`/`±Infinity` are quoted strings; bools are lowercase `true`/`false`; `find` value matching and `values` path matching are case-sensitive (`find` path matching goes through LIKE and is case-insensitive for ASCII) |
 | Path matching | `find`/`values` `fieldPath` matches literally as a suffix (`%`/`_` are escaped, not wildcards) |
+| Null values | A field whose value is `null` is indexed with the literal value `"null"` — rows exist only in fresh exports (older databases have no null rows; re-export with the current DataMod to get them). Empty strings and null list/dictionary items are not indexed. `find <path> null` enumerates Defs whose field is null (value must be lowercase); a missing field produces no row, so "field absent" cannot be queried |
 
 ---
 
@@ -144,6 +145,16 @@ rimsearcher get <defName> [--type T] [--brief] [--field <path>]
 
 **Output** (--field): the extracted JSON element as-is (string values include quotes, objects/arrays are raw JSON).
 
+**Examples** (--field) — scalars print bare, arrays/objects print raw JSON, null fields print `null`:
+```bash
+rimsearcher get Bullet_ChargeRifle --type ThingDef --field projectile.flyOverhead
+# false
+rimsearcher get Apparel_FlakVest --type ThingDef --field statBases
+# [{"stat":"MaxHitPoints","value":200}, ...]
+rimsearcher get Apparel_FlakVest --type ThingDef --field tools
+# null
+```
+
 **Errors** (--field): malformed path (bad format, e.g. `a[`) → exit 1; valid path with no match (missing property / out-of-range index) → exit 2.
 
 **Not found**: exit 2 with a stderr `Did you mean: …` list of similar def_names (same type, up to 5) plus a note that abstract Defs (`Abstract="true"`) are never instantiated and never appear in the database.
@@ -189,6 +200,8 @@ rimsearcher find <fieldPath> <value> [--type T] [--mod M] [--limit N]
 **Output**: Array of `{def_name, def_type, label, mod_name, package_id, field_path, field_value}`.
 
 **0 results**: A hint is written to stderr suggesting `rimsearcher search "value"`.
+
+**Null values**: `find <path> null` (lowercase literal) matches Defs whose field exists and is null — the complement of a normal `values` listing. Empty strings and missing fields have no rows and cannot be matched.
 
 **Key distinction**:
 - `find` = **exact** field value match. Requires full name: `RimWorld.CompShield`
@@ -251,7 +264,7 @@ rimsearcher values <fieldPath> [--limit N]
 | `--type` | null | Filter by def_type |
 | `--limit` | 200 | Max distinct values |
 
-**Output**: String array of distinct field values.
+**Output**: String array of distinct field values. When any Def's field is null, the literal `"null"` appears among the values (fresh exports only) — e.g. `values armorCategory --type DamageDef` returns `["Blunt","Heat","Sharp","null"]` on a current export.
 
 **0 hits**: stdout stays `[]` and the process exits with code 2.
 

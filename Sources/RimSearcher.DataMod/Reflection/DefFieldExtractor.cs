@@ -221,7 +221,13 @@ internal static class DefFieldExtractor
             catch { continue; }
 
             if (fieldValue == null)
+            {
+                // null 字段落字面量 "null" 标记行：支撑 find/values 的空字段（补集）查询。
+                // 不写 allTexts——FTS 全文若收录 null 标记，search "null" 会命中所有含空字段的 Def。
+                if (!AddNullMarker(defId, fieldPath, inserts, ref count))
+                    return;
                 continue;
+            }
 
             if (fieldValue is string text)
             {
@@ -288,6 +294,32 @@ internal static class DefFieldExtractor
 
         allTexts.Add(fieldValue);
         inserts.Add((defId, fieldPath, fieldValue));
+        count++;
+        return true;
+    }
+
+    /// <summary>
+    /// null 字段的标记行：值恒为字面量 "null"，与普通值共用同一张表同一查询面（find/values 直接可用）。
+    /// 过滤规则与 <see cref="TryAddValue"/> 一致（count 上限、噪声字段），仅不写 allTexts。
+    /// </summary>
+    private static bool AddNullMarker(
+        int defId,
+        string fieldPath,
+        List<(int DefId, string FieldPath, string FieldValue)> inserts,
+        ref int count)
+    {
+        if (count >= MaxValuesPerDef)
+            return false;
+        if (SkipFieldNames.Contains(fieldPath))
+            return true;
+
+        foreach (var prefix in SkipFieldPrefixes)
+        {
+            if (fieldPath.StartsWith(prefix, StringComparison.Ordinal))
+                return true;
+        }
+
+        inserts.Add((defId, fieldPath, "null"));
         count++;
         return true;
     }
