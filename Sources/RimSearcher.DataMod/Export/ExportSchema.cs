@@ -34,10 +34,12 @@ internal static class ExportSchema
             );
 
             -- null 字段的紧凑表示：路径存字典（去重），(def_id, path_id) 一行一个空字段。
-            -- 与 field_values 分离：空字段不是值，复用值通道会让每个 null 行重复存储路径文本（体积翻倍）。
+            -- path_rev 与 field_values 同构：values 的 null 分支走反转前缀范围（BINARY 大小写敏感），
+            -- 与普通分支保持同一匹配契约（LIKE 大小写不敏感会破坏后缀精确匹配）。
             CREATE TABLE field_paths (
-                id   INTEGER PRIMARY KEY,
-                path TEXT NOT NULL UNIQUE
+                id       INTEGER PRIMARY KEY,
+                path     TEXT NOT NULL UNIQUE,
+                path_rev TEXT NOT NULL
             );
 
             CREATE TABLE null_fields (

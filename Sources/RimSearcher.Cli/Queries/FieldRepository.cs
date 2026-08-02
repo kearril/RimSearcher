@@ -200,6 +200,7 @@ internal sealed class FieldRepository
         // field_path_rev 列由 DataMod 导出（捆绑发布必含）。
         var reversed = ReversePath(fieldPath);
         // UNION 空字段标记："null" 与其他值一同排序、同受 LIMIT 约束。
+        // null 分支与普通分支同构（path_rev 反转前缀，BINARY 大小写敏感）——LIKE 会破坏后缀精确匹配契约。
         command.CommandText = """
             SELECT v FROM (
                 SELECT DISTINCT fv.field_value AS v
@@ -213,14 +214,13 @@ internal sealed class FieldRepository
                     SELECT 1 FROM null_fields nf
                     JOIN field_paths fp ON fp.id = nf.path_id
                     JOIN defs d ON d.id = nf.def_id
-                    WHERE fp.path LIKE '%' || @path ESCAPE '\'
+                    WHERE fp.path_rev >= @low AND fp.path_rev < @high
                       AND (@type IS NULL OR d.def_type = @type)
                 )
             ) ORDER BY v LIMIT @limit
             """;
         command.Parameters.AddWithValue("@low", reversed);
         command.Parameters.AddWithValue("@high", NextBoundary(reversed));
-        command.Parameters.AddWithValue("@path", EscapeLikePattern(fieldPath));
         QueryParameters.AddFilters(command, type, null);
         command.Parameters.AddWithValue("@limit", limit);
 

@@ -36,7 +36,7 @@ internal static class FieldValueWriter
     /// 与 CLI 的 FieldRepository.ReversePath 算法一致，修改时必须同步两侧。
     /// 路径字符集为 ASCII（C# 标识符 + [ ] . 数字），无代理对问题。
     /// </summary>
-    private static string ReversePath(string path)
+    internal static string ReversePath(string path)
     {
         var chars = path.ToCharArray();
         Array.Reverse(chars);

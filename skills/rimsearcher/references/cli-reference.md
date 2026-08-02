@@ -13,7 +13,7 @@ defs:        id, def_name, def_type, label, description, mod_name, package_id, s
 field_values: def_id, field_path, field_path_rev, field_value
        field_path_rev is the character-reversed path — it backs the `values` suffix index
        (values queries match case-sensitively on it)
-field_paths:  id, path          — path dictionary for null fields (current exports)
+field_paths:  id, path, path_rev  — path dictionary for null fields (current exports)
 null_fields:  def_id, path_id   — Defs whose field exists and is null (current exports)
 defs_fts:    FTS5( def_name, label, description, full_text )  — tokenize='unicode61'
 ```

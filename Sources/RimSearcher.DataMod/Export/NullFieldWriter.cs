@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using Microsoft.Data.Sqlite;
 
 namespace RimSearcher.DataMod.Export;
@@ -14,8 +15,9 @@ internal static class NullFieldWriter
         List<(int DefId, string FieldPath)> values)
     {
         using var register = connection.CreateCommand();
-        register.CommandText = "INSERT OR IGNORE INTO field_paths (path) VALUES (@p)";
+        register.CommandText = "INSERT OR IGNORE INTO field_paths (path, path_rev) VALUES (@p, @pr)";
         var registerParam = register.Parameters.Add("@p", SqliteType.Text);
+        var registerRevParam = register.Parameters.Add("@pr", SqliteType.Text);
 
         using var selectId = connection.CreateCommand();
         selectId.CommandText = "SELECT id FROM field_paths WHERE path = @p";
@@ -31,6 +33,7 @@ internal static class NullFieldWriter
             if (!pathIds.TryGetValue(value.FieldPath, out var id))
             {
                 registerParam.Value = value.FieldPath;
+                registerRevParam.Value = FieldValueWriter.ReversePath(value.FieldPath);
                 register.ExecuteNonQuery();
                 selectParam.Value = value.FieldPath;
                 using var reader = selectId.ExecuteReader();
