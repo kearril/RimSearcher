@@ -140,10 +140,11 @@ public static class DefExporter
         ExportSchema.CreateIndexes(conn);
 
         // 版本标记（事务内，导出失败回滚不留半成品标记）：CLI 以此认证库的产出版本。
+        // PRAGMA 赋值不接受绑定参数，值由自产版本号编码而来，无注入面。
         using (var versionCommand = conn.CreateCommand())
         {
-            versionCommand.CommandText = "PRAGMA user_version = @v";
-            versionCommand.Parameters.AddWithValue("@v", EncodeVersion(Assembly.GetExecutingAssembly().GetName().Version));
+            versionCommand.CommandText =
+                $"PRAGMA user_version = {EncodeVersion(Assembly.GetExecutingAssembly().GetName().Version ?? new Version(0, 0, 0))}";
             versionCommand.ExecuteNonQuery();
         }
 
