@@ -21,10 +21,38 @@ internal static class NativeLibrary
     [DllImport("libdl", SetLastError = true)]
     private static extern IntPtr dlopen(string fileName, int flags);
 
-    [DllImport("libdl")]
+    // glibc ≥ 2.34 起 libdl 并入 libc（libdl.so 成空壳，不再导出 dlopen），由 libc 导出。
+    // EntryPoint 必须显式指定：默认 EntryPoint 是方法名 dlopen_libc，而 libc 只导出 dlopen。
+    [DllImport("libc", EntryPoint = "dlopen", SetLastError = true)]
+    private static extern IntPtr dlopen_libc(string fileName, int flags);
+
+    // libc 自 GLIBC_2.0 起导出 dlsym，全 glibc 版本可用；句柄与解析库无关。
+    [DllImport("libc")]
     private static extern IntPtr dlsym(IntPtr handle, string symbol);
 
     private const int RtldNow = 2;
+
+    /// <summary>
+    /// 按系统能力选择 dlopen：先试 libdl（glibc &lt; 2.34），失败时回退 libc（glibc ≥ 2.34）。
+    /// Mono 对 DllImport 解析失败可能抛异常也可能返回零，两种都覆盖。
+    /// </summary>
+    private static IntPtr Dlopen(string fileName, int flags)
+    {
+        IntPtr handle;
+        try
+        {
+            handle = dlopen(fileName, flags);
+        }
+        catch (EntryPointNotFoundException)
+        {
+            handle = IntPtr.Zero;
+        }
+        catch (DllNotFoundException)
+        {
+            handle = IntPtr.Zero;
+        }
+        return handle != IntPtr.Zero ? handle : dlopen_libc(fileName, flags);
+    }
 
     private static IntPtr _handle = IntPtr.Zero;
     private static bool _initialized;
@@ -64,8 +92,8 @@ internal static class NativeLibrary
         if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
             return ("e_sqlite3.dll", LoadLibrary);
         if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
-            return ("libe_sqlite3.dylib", path => dlopen(path, RtldNow));
-        return ("libe_sqlite3.so", path => dlopen(path, RtldNow));
+            return ("libe_sqlite3.dylib", path => Dlopen(path, RtldNow));
+        return ("libe_sqlite3.so", path => Dlopen(path, RtldNow));
     }
 
     private sealed class FunctionPointerResolver : IGetFunctionPointer
