@@ -54,6 +54,9 @@ internal static class FieldCommands
             output.Write(values);
             if (values.Count == 0)
             {
+                Console.Error.WriteLine(
+                    $"Hint: no values for '{fieldPath}' — the path may not exist in any def, " +
+                    "or --type filtered everything (try without --type)");
                 if (fieldPath.Contains('.') && !fieldPath.Contains('['))
                     Console.Error.WriteLine(
                         "Hint: field paths match literally as a suffix — nested list paths need their index segment " +
