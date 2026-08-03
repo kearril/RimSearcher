@@ -61,7 +61,7 @@ internal static class CjkBigramExpander
 
     // 注：CJK Extension B（U+20000 起）在 char 上不可达，代理对按两个 char 参与分段，
     // 与 DataMod 侧行为一致。
-    private static bool IsCjkChar(char character) =>
+    internal static bool IsCjkChar(char character) =>
         character is >= '\u4E00' and <= '\u9FFF'
             or >= '\u3400' and <= '\u4DBF';
 }

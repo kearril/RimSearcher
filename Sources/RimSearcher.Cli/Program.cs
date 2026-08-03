@@ -29,7 +29,7 @@ if (args.Length == 0 || (args.Length == 1 && (args[0] == "-h" || args[0] == "--h
 {
     Console.WriteLine("Usage: rimsearcher <command> [options]");
     Console.WriteLine("Commands: " + string.Join(", ", knownCommands));
-    Console.WriteLine("Full documentation: skills/rimsearcher/references/cli-reference.md");
+    Console.WriteLine("Full documentation: skills/rimsearcher/SKILL.md");
     return;
 }
 

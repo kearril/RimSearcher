@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Linq;
 using RimSearcher.Cli.Infrastructure;
 using RimSearcher.Cli.Models;
 using RimSearcher.Cli.Search;
@@ -69,17 +70,35 @@ internal sealed class DefRepository
     {
         using var connection = _connections.Open();
         using var command = connection.CreateCommand();
-        command.CommandText = """
-            SELECT COUNT(*)
+        // 并集计数：--count 语义是总命中，不受可见行 limit 影响；UNION 按 def id 去重，
+        // 与结果列表的去重口径一致（子串补充仅在单裸词时启用）。
+        var substringTerm = SubstringTermFor(keyword);
+        var substringSql = substringTerm is null ? "" :
+            $"""
+            UNION
+            SELECT d.id
             FROM defs d
-            JOIN defs_fts fts ON d.id = fts.rowid
-            WHERE defs_fts MATCH @kw
+            WHERE {SubstringMatchClause(nameOnly)}
               AND (@type IS NULL OR d.def_type = @type)
               AND (@mod IS NULL OR d.mod_name = @mod)
+            """;
+        command.CommandText = $"""
+            SELECT COUNT(*)
+            FROM (
+                SELECT d.id
+                FROM defs d
+                JOIN defs_fts fts ON d.id = fts.rowid
+                WHERE defs_fts MATCH @kw
+                  AND (@type IS NULL OR d.def_type = @type)
+                  AND (@mod IS NULL OR d.mod_name = @mod)
+                {substringSql}
+            )
             """;
         // 查询侧 CJK 大词展开：MATCH 的空格是 AND 语义，原始整段中文 token
         // 在索引中不存在（写侧只保留原文 token + 二元组），必须替换为二元组。
         command.Parameters.AddWithValue("@kw", BuildMatchExpression(keyword, nameOnly));
+        if (substringTerm is not null)
+            command.Parameters.AddWithValue("@pattern", SearchSubstring.LikePattern(substringTerm));
         QueryParameters.AddFilters(command, type, mod);
         return (long)command.ExecuteScalar()!;
     }
@@ -87,28 +106,68 @@ internal sealed class DefRepository
     public IReadOnlyList<SearchResult> Search(string keyword, string? type, string? mod, int limit, bool nameOnly)
     {
         using var connection = _connections.Open();
-        using var command = connection.CreateCommand();
-        command.CommandText = """
-            SELECT d.def_name, d.def_type, d.label, d.mod_name, d.package_id, rank
-            FROM defs d
-            JOIN defs_fts fts ON d.id = fts.rowid
-            WHERE defs_fts MATCH @kw
-              AND (@type IS NULL OR d.def_type = @type)
-              AND (@mod IS NULL OR d.mod_name = @mod)
-            ORDER BY rank
-            LIMIT @limit
-            """;
-        command.Parameters.AddWithValue("@kw", BuildMatchExpression(keyword, nameOnly));
-        QueryParameters.AddFilters(command, type, mod);
-        command.Parameters.AddWithValue("@limit", limit);
-
         var results = new List<SearchResult>();
-        using var reader = command.ExecuteReader();
-        while (reader.Read())
+        using (var command = connection.CreateCommand())
         {
-            results.Add(new SearchResult(
-                reader.GetString(0), reader.GetString(1), reader.ReadLabel(0, 2),
-                reader.GetString(3), reader.ReadOptionalString(4), reader.GetDouble(5)));
+            command.CommandText = """
+                SELECT d.def_name, d.def_type, d.label, d.mod_name, d.package_id, rank
+                FROM defs d
+                JOIN defs_fts fts ON d.id = fts.rowid
+                WHERE defs_fts MATCH @kw
+                  AND (@type IS NULL OR d.def_type = @type)
+                  AND (@mod IS NULL OR d.mod_name = @mod)
+                ORDER BY rank
+                LIMIT @limit
+                """;
+            command.Parameters.AddWithValue("@kw", BuildMatchExpression(keyword, nameOnly));
+            QueryParameters.AddFilters(command, type, mod);
+            command.Parameters.AddWithValue("@limit", limit);
+
+            using var reader = command.ExecuteReader();
+            while (reader.Read())
+            {
+                results.Add(new SearchResult(
+                    reader.GetString(0), reader.GetString(1), reader.ReadLabel(0, 2),
+                    reader.GetString(3), reader.ReadOptionalString(4), reader.GetDouble(5), "token"));
+            }
+        }
+
+        // 子串补充：列表未满才查——已满则补充行不可见，跳过省一次全表 LIKE 扫描。
+        var substringTerm = SubstringTermFor(keyword);
+        if (results.Count >= limit || substringTerm is null)
+            return results;
+
+        var tokenKeys = results.Select(r => (r.DefName, r.DefType)).ToHashSet();
+        using (var command = connection.CreateCommand())
+        {
+            command.CommandText = $"""
+                SELECT d.def_name, d.def_type, d.label, d.mod_name, d.package_id
+                FROM defs d
+                WHERE {SubstringMatchClause(nameOnly)}
+                  AND (@type IS NULL OR d.def_type = @type)
+                  AND (@mod IS NULL OR d.mod_name = @mod)
+                ORDER BY d.def_type, d.def_name
+                LIMIT @limit
+                """;
+            command.Parameters.AddWithValue("@pattern", SearchSubstring.LikePattern(substringTerm));
+            QueryParameters.AddFilters(command, type, mod);
+            // 多取若干行供去重损耗（token 行重叠会消耗 SQL limit），填满结果上限即停。
+            command.Parameters.AddWithValue("@limit", limit);
+
+            using var reader = command.ExecuteReader();
+            while (reader.Read())
+            {
+                var defName = reader.GetString(0);
+                var defType = reader.GetString(1);
+                // 同一 def 的 FTS 命中优先保留（带相关度），补充行只填补空缺。
+                if (!tokenKeys.Add((defName, defType)))
+                    continue;
+                results.Add(new SearchResult(
+                    defName, defType, reader.ReadLabel(0, 2),
+                    reader.GetString(3), reader.ReadOptionalString(4), null, "substring"));
+                if (results.Count >= limit)
+                    break;
+            }
         }
         return results;
     }
@@ -163,12 +222,30 @@ internal sealed class DefRepository
     /// 构造 MATCH 表达式：--name-only 时限定 def_name 列（FTS 列过滤），
     /// 括号包装使 OR/AND 的每个子表达式都落在列内（否则右分支会泄漏为全字段匹配）。
     /// CJK 大词展开在列过滤内同样生效（def_name 虽全英文，保持表达式语义一致）。
+    /// 操作符关键词（or/and/not）作裸词时引号化为字面词——FTS5 把裸 OR 当运算符会解析失败。
     /// </summary>
     private static string BuildMatchExpression(string keyword, bool nameOnly)
     {
-        var expanded = CjkBigramExpander.ExpandForMatch(keyword);
+        var expanded = CjkBigramExpander.ExpandForMatch(SearchSubstring.FtsLiteral(keyword));
         return nameOnly ? $"def_name:({expanded})" : expanded;
     }
+
+    /// <summary>
+    /// 子串补充的启用条件：单裸词、非 FTS 操作符、达词长门槛。FTS 语法查询（*、引号、OR/NOT、短语）
+    /// 语义复杂，包含匹配与之互相干扰；"and"/"not" 等操作符词作子串会命中大量英文名字，纯噪音。
+    /// </summary>
+    private static string? SubstringTermFor(string keyword) =>
+        SearchSubstring.IsBareWord(keyword)
+            && !SearchSubstring.IsFtsOperator(keyword)
+            && SearchSubstring.MeetsLengthThreshold(keyword)
+            ? keyword
+            : null;
+
+    /// <summary>包含匹配的列范围：--name-only 限定 def_name，其余含 label；括号保证过滤条件作用于两个分支。</summary>
+    private static string SubstringMatchClause(bool nameOnly) =>
+        nameOnly
+            ? "(d.def_name LIKE @pattern ESCAPE '\\')"
+            : "(d.def_name LIKE @pattern ESCAPE '\\' OR d.label LIKE @pattern ESCAPE '\\')";
 
     public IReadOnlyList<string> FindTypes(string defName)
     {

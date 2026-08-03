@@ -10,13 +10,18 @@ internal sealed record DefSummary(
     [property: JsonPropertyName("mod_name")] string ModName,
     [property: JsonPropertyName("package_id")] string? PackageId);
 
+/// <summary>
+/// search 结果：match 区分 FTS 整词命中（带 bm25 rank）与 def_name/label 包含补充
+/// （无 rank，全局配置 WhenWritingNull 省略输出）。
+/// </summary>
 internal sealed record SearchResult(
     [property: JsonPropertyName("def_name")] string DefName,
     [property: JsonPropertyName("def_type")] string DefType,
     [property: JsonPropertyName("label")] string Label,
     [property: JsonPropertyName("mod_name")] string ModName,
     [property: JsonPropertyName("package_id")] string? PackageId,
-    [property: JsonPropertyName("rank")] double Rank);
+    [property: JsonPropertyName("rank")] double? Rank,
+    [property: JsonPropertyName("match")] string Match);
 
 internal sealed record FieldMatch(
     [property: JsonPropertyName("def_name")] string DefName,
