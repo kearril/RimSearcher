@@ -74,7 +74,7 @@ internal static class SearchCommands
         if (!keyword.Any(char.IsAsciiLetter))
             return;
         Console.Error.WriteLine(
-            $"Hint: 0 hits for '{keyword}'. The FTS index tokenizes whole words — " +
-            $"compound names like 'ShieldBelt' need a prefix wildcard: 'shield*'");
+            $"Hint: 0 hits for '{keyword}'. FTS expressions match whole tokens — try a prefix wildcard on a term " +
+            $"(e.g. 'term*'), simpler terms, or browse with 'list --type <T>' (run 'types' to list valid types)");
     }
 }
