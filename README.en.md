@@ -4,6 +4,9 @@
 
 English | [简体中文](README.md)
 
+> **Design philosophy**: turn the tool's errors into knowledge inputs — let the model learn from mistakes.
+> Errors are documentation, failures are lessons: every limitation and failure path is designed as learning material for the model.
+
 #### RimSearcher V3 is a full rebuild. Starting with this version, the tool abandons the old MCP architecture in favor of a skills + CLI design, which brings better performance, lower overhead, and smarter AI decisions — and it now supports source-code analysis of your mod environment!
 
 ## Introduction
@@ -12,7 +15,7 @@ RimSearcher specializes in the **Def data layer** — XML definitions, field str
 
 The Skill file ties both together: CLI locates the Def → extracts C# type names → DecompilerServer reads the source, forming a complete analysis pipeline.
 
-Support for multi-mod environments comes from two layers working together: DecompilerServer can load the vanilla game and any mod's `.dll` assemblies side by side, each with its own context alias, so the AI can inspect source and IL of multiple assemblies in parallel to pinpoint hooks and compatibility boundaries. Meanwhile, RimSearcher's DataMod exports the current mod environment's Def data to a SQLite database in-game, and the CLI provides full-text search over it — one handles C#, the other handles XML data.
+Support for multi-mod environments comes from two layers working together: DecompilerServer can load the vanilla game and any mod's `.dll` assemblies side by side, each with its own context alias, so the AI can inspect source and IL of multiple assemblies in parallel to pinpoint hooks and compatibility boundaries. Meanwhile, RimSearcher's DataMod exports the current mod environment's Def data to a SQLite database in-game, and the CLI provides full-text search over it — one handles C# source, the other handles Def-data export and querying.
 
 ## Quick Start
 
@@ -35,7 +38,7 @@ Download from [Releases](https://github.com/kearril/RimSearcher/releases/latest)
 | `rimsearcher.exe` | CLI command-line tool |
 | `RimSearcher_DataMod.zip` | In-game Def data export mod |
 
-> **Skills are not published with Releases**: skill files update frequently and are independent of CLI/DataMod functionality. Always fetch the latest version directly from the repository via the "Configure AI Skills" step below (no need to wait for a Release).
+> **Skills are not published with Releases**: always fetch the latest version directly from the repository via the "Configure AI Skills" step below.
 
 You also need the decompilation MCP: [DecompilerServer](https://github.com/pardeike/DecompilerServer) — visit its repo and configure the MCP tool.
 
@@ -54,14 +57,14 @@ When the export finishes, place the generated `defs.db` in the same directory as
 Open a terminal in the directory containing `rimsearcher.exe` and run:
 
 ```bash
-rimsearcher install
+.\rimsearcher install
 ```
 
-After this step, don't move the exe file — the system's PATH entry would point to the old location. If you do move it, just run the command again.
+Note: Windows PowerShell does not resolve bare command names from the current directory — use the `.\` prefix on first install (CMD accepts `rimsearcher install` too). After this step, don't move the exe file — the system's PATH entry would point to the old location. If you do move it, just run the command again.
 
 ### 5. Configure AI Skills
 
-Download [skills.zip](https://raw.githubusercontent.com/kearril/RimSearcher/master/skills.zip) (this link always points to the latest version in the repository, independent of Releases), extract it, and place `skills/rimsearcher/` into your AI assistant's skills directory. Restart the AI client to activate.
+Download [skills.zip](https://raw.githubusercontent.com/kearril/RimSearcher/master/skills.zip) (this link always points to the latest version in the repository), extract it, and place `skills/rimsearcher/` into your AI assistant's skills directory. Restart the AI client to activate.
 
 ### 6. Done
 
@@ -73,19 +76,19 @@ Restart and start testing and using the tool.
 
 | Component | How to update |
 |---|---|
-| **rimsearcher CLI** | When a Release is available, run `rimsearcher update` in a terminal — it downloads the latest version from the GitHub Release and replaces the current exe |
-| **rimsearcher Skill** | Download [skills.zip](https://raw.githubusercontent.com/kearril/RimSearcher/master/skills.zip), extract and overwrite the skills directory. Skills are **not published with Releases** — always fetch from the repository, so updates land right after each push |
-| **RimSearcher.DataMod** | Download the new `RimSearcher_DataMod.zip` from [Releases](https://github.com/kearril/RimSearcher/releases/latest) and extract over the Mods directory |
+| **rimsearcher CLI** | Download the new `rimsearcher.exe` from [Releases](https://github.com/kearril/RimSearcher/releases/latest) and replace the old exe, then update DataMod and re-export the database |
+| **rimsearcher Skill** | Download [skills.zip](https://raw.githubusercontent.com/kearril/RimSearcher/master/skills.zip), extract and overwrite the skills directory |
+| **RimSearcher.DataMod** | Download the new `RimSearcher_DataMod.zip` from [Releases](https://github.com/kearril/RimSearcher/releases/latest), extract and replace the old mod, then re-export the database |
 
-> Skills are important files that shape AI decisions and may be optimized frequently, and updating them never affects CLI or DataMod functionality — so skills don't get a Release on every update. How to tell whether skills have changed? Check the badge at the top of this page ( ![Skills Update Time](https://img.shields.io/endpoint?url=https%3A%2F%2Fkearril.github.io%2FRimSearcher%2Fskills-update.json) ); it shows the last modification time of `skills.zip` in UTC+8. If it's newer than your local files, there's an update.
+> Skills are important files that shape AI decisions and may be optimized frequently, so skills are not published with Releases. How to tell whether skills have changed? Check the badge at the top of this page ( ![Skills Update Time](https://img.shields.io/endpoint?url=https%3A%2F%2Fkearril.github.io%2FRimSearcher%2Fskills-update.json) ); it shows the last modification time of `skills.zip` in UTC+8. If it's newer than your local files, there's an update.
 
 ## Components
 
 | Component | Description |
 |---|---|
-| **RimSearcher.DataMod** | In-game reflection export mod. Exports the currently loaded Def data to `defs.db` at runtime; labels and descriptions use the game's current language. The in-game UI supports English, Simplified Chinese and Traditional Chinese; Windows only |
-| **rimsearcher CLI** | .NET command-line tool. 10 commands: `search` `list` `get` `find` `fields` `values` `types` `mods` `install` `update` |
-| **rimsearcher Skill** | AI assistant skill files. Teach the AI to locate and analyze RimWorld source code using the CLI + decompilation MCP, with anti-hallucination rules |
+| **RimSearcher.DataMod** | In-game Def data export mod. Exports the currently loaded Def data to `defs.db`; labels and descriptions use the game's current language |
+| **rimsearcher CLI** | .NET command-line tool. 10 commands: `search` `list` `get` `find` `fields` `values` `types` `mods` `install` `check update` |
+| **rimsearcher Skill** | AI assistant skill files. Teach the AI to locate and analyze RimWorld source code using the CLI + decompilation MCP, with anti-hallucination rules and data-verification instructions |
 
 ## Building
 
@@ -108,99 +111,40 @@ dotnet build Sources/RimSearcher.DataMod/ -c Release
 
 ## Contributing Skills
 
-Contributions of your RimWorld mod development experience to the Skill repository are welcome. If you have common analysis workflows, frequent hook points, or compatibility experience with specific mods, submit a PR to extend the Skill files and make the AI assistant more knowledgeable about RimWorld.
-
-> The RimSearcher-specific skills need continuous refinement to cover more development scenarios.
+Contributions of your RimWorld mod development experience to the Skill repository are welcome. If you have common analysis workflows, frequent hook points, or compatibility experience with specific mods, submit a PR to extend the Skill files and make the AI assistant more knowledgeable about RimWorld — which benefits every RimSearcher user.
 
 ## Command Reference
 
-### search — full-text search
-
-```
+```bash
+# search — full-text search: fuzzy keyword matching (mixed CN/EN, wildcards & boolean ops; a single bare word also matches defname/label substrings; --name-only restricts to the name column)
 rimsearcher search <keyword> [--type T] [--mod M] [--limit N] [--count] [--name-only]
-```
-
-FTS5 full-text index covers Def names, labels, descriptions and all field values. Mixed Chinese/English queries, prefix wildcards and boolean combinations supported. `--name-only` restricts matching to the def_name column, dropping description noise.
-
-### list — paginated browsing
-
-```
+# list — paginated browsing: list Defs by type/mod
 rimsearcher list [--type T] [--mod M] [--limit N] [--offset N] [--total]
-```
-
-Browse Defs by type or mod with pagination. No search overhead; sorted by def_type, def_name.
-
-### get — precise lookup
-
-```
+# get — precise lookup: fetch one Def by defName (--brief extracts *Class names and polymorphic $type, --field extracts one field)
 rimsearcher get <defName> [--type T] [--brief] [--field <path>]
-```
-
-Locate a Def by name. `--brief` extracts all `*Class` bridge field values from the Def (`thingClass`, `compClass`, `workerClass`, `hediffClass`, etc., type-independent) as entry points for the decompilation MCP. `--field` extracts a single field by path (`a.b[0].c`). When multiple types match, candidates are listed; when nothing matches, similar-name candidates and an abstract-Def note are shown.
-
-### find — reverse lookup
-
-```
+# find — reverse lookup: exact field-value match (which Defs reference a C# class)
 rimsearcher find <fieldPath> <value> [--type T] [--mod M] [--limit N]
-```
-
-Given a field path and a C# class name, find all Defs referencing that class — ideal for tracing which items use a given Comp or ThingClass.
-
-### fields — field tree
-
-```
+# fields — field tree: inspect one Def's full nested structure (--filter supports path glob)
 rimsearcher fields <defName> --type <T> [--limit N] [--filter <glob>]
-```
-
-Show the complete field tree of a single Def for inspecting nested structures. `--filter` supports path glob filtering (`*` crosses segments, e.g. `comps[0].*`).
-
-### values — value enumeration
-
-```
+# values — value enumeration: distinct values of a field path
 rimsearcher values <fieldPath> [--type T] [--limit N]
-```
-
-Enumerate distinct values for any field path.
-
-### types — type statistics
-
-```
+# types — def type statistics
 rimsearcher types
-```
-
-List all Def types with counts, descending.
-
-### mods — mod statistics
-
-```
+# mods — mod statistics
 rimsearcher mods
-```
-
-List all mods with their Def counts, descending.
-
-### install — add to PATH
-
-```
+# install — add to PATH (Windows)
 rimsearcher install
+# check update — check for a newer GitHub Release
+rimsearcher check update
 ```
-
-Adds the rimsearcher directory to the user PATH for global use. Skipped automatically when already present.
-
-### update — self-update
-
-```
-rimsearcher update
-```
-
-Downloads the latest version from the GitHub Release and replaces the current executable.
 
 ### AI integration (Skill)
 
-The Skill files define the standard analysis pipeline; once loaded, the AI follows it automatically to locate source code. Built-in anti-hallucination rules: never guess APIs; read the target method's IL before writing a Harmony patch.
+The Skill files teach the AI to analyze RimWorld mechanics with the CLI and the decompilation MCP along a standard pipeline, with built-in anti-hallucination rules and data-trust verification.
 
 ### DataMod — in-game export
 
-RimSearcher.DataMod is an in-game mod that reflects over `DefDatabase<T>` at runtime and exports all Def data of the current mod environment to a SQLite database. The resulting `defs.db` contains serialized Def JSON (max depth 100), a field-value table, and an FTS5 full-text index for the CLI to query.
+RimSearcher.DataMod is an in-game mod that exports all Def data of the current mod environment to a SQLite database for the CLI to query; the database is version-locked to the CLI, so re-export after updating either side.
 
 ## Runtime Dependencies
 

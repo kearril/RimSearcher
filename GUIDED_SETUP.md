@@ -55,8 +55,10 @@ Tell the user to enable **RimSearcherDataMod** in the in-game Mod list.
 Run this in the directory containing `rimsearcher.exe`:
 
 ```bash
-rimsearcher install
+.\rimsearcher install
 ```
+
+(PowerShell does not resolve bare command names from the current directory — use `.\` on the first run; CMD accepts both.)
 
 Remind the user not to move the exe file afterwards.
 
