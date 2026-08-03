@@ -31,6 +31,7 @@ rimsearcher get <defName> [--type T] [--brief] [--field <path>]
 - `<defName>`: exact name; `--type` required when it matches multiple def_types
 - `--brief`: return only `classes[]` — the C# bridge (`*Class` fields + polymorphic `$type` types) for the decompiler
 - `--field <path>`: extract a single field (`a.b[0].c`); `<path>.$type` returns a polymorphic object's class name (quote `$type` in shells)
+- `get` returns the full JSON — long output may be truncated by the host's display
 
 ```bash
 # Reverse lookup: exact field-value match — which Defs use a C# class
