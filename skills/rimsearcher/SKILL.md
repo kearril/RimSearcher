@@ -41,7 +41,7 @@ Values are case-sensitive and formatted canonically: booleans are lowercase — 
 A defName can exist in multiple def_types (e.g. `Human` is in BodyDef, ThingDef, HediffGiverSetDef). Without `--type`, the command exits with code 2 and prints candidates — this is NOT a crash, just add `--type` and retry.
 Not found → exit 2 plus a `Did you mean: …` list of similar def_names (same type) and a note that abstract Defs (`Abstract="true"`) are never instantiated and never appear in the database — an abstract name is not a typo, stop looking.
 A misspelled `--type` is rejected up front: `unknown def_type 'X'` on stderr, **exit 1** — run `types` to list valid types.
-`--brief` returns `{classes[]}` — every `*Class`-suffixed string field in the def (thingClass, compClass, workerClass, hediffClass, …), i.e. the C# bridge to the decompiler. Decompile the entries relevant to your question; if none fits, use `fields` and scan `field_path`/`field_value` pairs yourself.
+`--brief` returns `{classes[]}` — every `*Class`-suffixed string field in the def (thingClass, compClass, workerClass, hediffClass, …) plus polymorphic object types (`$type` markers, e.g. a genStep's runtime class), i.e. the C# bridge to the decompiler. Decompile the entries relevant to your question; if none fits, use `fields` and scan `field_path`/`field_value` pairs yourself. For a single object field's class, `--field <path>.$type` returns it directly; `find <path> $type <class>` finds all Defs using that class.
 `--field <path>` extracts a single field (same path format as `fields`: `a.b[0].c`) instead of the full JSON — use it when only one value is needed (saves tokens and parsing); mutually exclusive with `--brief`.
 Large defs: `fields` accepts a `--filter` glob (`*` = any run of characters) to narrow to a path subtree, e.g. `comps[0].*` or `ingestible.*`.
 
@@ -61,7 +61,7 @@ User wants to understand a game mechanic end-to-end.
 
 1. `search "<query>" --type T`          ← Latin/alphanumeric prefix: append `*`; CJK: use as-is
    If several Defs match, disambiguate automatically first: a mechanic search usually has one canonical def_type (map generation → GenStepDef/MapGeneratorDef, apparel stats → StatDef, …). When `def_type` + `label` + `mod_name` single out the intended Def, continue without asking; only present candidates and ask when they genuinely conflict.
-2. `get <name> --type T --brief`          ← extracts `classes[]` (all `*Class` bridge fields)
+2. `get <name> --type T --brief`          ← extracts `classes[]` (all `*Class` + polymorphic `$type` bridges)
    Decompile the entries relevant to the question.
    If none yields the behavior, use `fields <name> --type <T>` and inspect every `field_path` / `field_value` pair for fully-qualified C# type names — paths ending in `Class` are common clues (workerClass, hediffClass, driverClass, …), not an exhaustive list.
 3. Decompiler:

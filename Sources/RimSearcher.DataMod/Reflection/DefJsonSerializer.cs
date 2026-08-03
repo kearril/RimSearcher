@@ -12,6 +12,7 @@ namespace RimSearcher.DataMod.Reflection;
 /// 输出契约：按反射字段名原样输出（含嵌套对象、集合与字典），字段集合与游戏反序列化器一致；
 /// 最大深度 100（真实数据 JSON 深度最深 29 层，哨兵仅防御病态结构），超深输出 "$truncated"，
 /// 循环引用输出 "$cyclic_ref"，嵌套 Def 引用仅输出 defName，
+/// 多态对象（运行时类型 ≠ 声明类型，或声明类型为抽象/接口）在对象键首输出 "$type" 运行时类型全名，
 /// 非有限数（NaN/±Infinity）输出带引号字符串（RFC 8259 允许，保证 JSON 合法）。
 /// </summary>
 internal static class DefJsonSerializer
@@ -25,7 +26,7 @@ internal static class DefJsonSerializer
     {
         var builder = new StringBuilder();
         var visited = new HashSet<object>();
-        SerializeValue(def, builder, visited, 0);
+        SerializeValue(def, builder, visited, 0, null);
         return builder.ToString();
     }
 
@@ -33,7 +34,8 @@ internal static class DefJsonSerializer
         object? value,
         StringBuilder builder,
         HashSet<object> visited,
-        int depth)
+        int depth,
+        Type? declaredType)
     {
         if (value == null)
         {
@@ -80,13 +82,14 @@ internal static class DefJsonSerializer
 
             if (value is IList list)
             {
-                SerializeList(list, builder, visited, depth);
+                SerializeList(list, builder, visited, depth, PolymorphicTypeMarker.GetDeclaredElementType(type));
                 return;
             }
 
             if (value is IDictionary dictionary)
             {
-                SerializeDictionary(dictionary, builder, visited, depth);
+                var (declaredKeyType, declaredValueType) = PolymorphicTypeMarker.GetDeclaredDictionaryTypes(type);
+                SerializeDictionary(dictionary, builder, visited, depth, declaredKeyType, declaredValueType);
                 return;
             }
 
@@ -102,7 +105,7 @@ internal static class DefJsonSerializer
                 return;
             }
 
-            SerializeObject(value, type, builder, visited, depth);
+            SerializeObject(value, type, builder, visited, depth, declaredType);
         }
         finally
         {
@@ -163,19 +166,19 @@ internal static class DefJsonSerializer
         builder.Append(value.ToString("G", CultureInfo.InvariantCulture));
     }
 
-    private static void SerializeList(IList list, StringBuilder builder, HashSet<object> visited, int depth)
+    private static void SerializeList(IList list, StringBuilder builder, HashSet<object> visited, int depth, Type? declaredElementType)
     {
         builder.Append('[');
         for (int index = 0; index < list.Count; index++)
         {
             if (index > 0)
                 builder.Append(',');
-            SerializeValue(list[index], builder, visited, depth + 1);
+            SerializeValue(list[index], builder, visited, depth + 1, declaredElementType);
         }
         builder.Append(']');
     }
 
-    private static void SerializeDictionary(IDictionary dictionary, StringBuilder builder, HashSet<object> visited, int depth)
+    private static void SerializeDictionary(IDictionary dictionary, StringBuilder builder, HashSet<object> visited, int depth, Type? declaredKeyType, Type? declaredValueType)
     {
         builder.Append('{');
         bool first = true;
@@ -184,9 +187,9 @@ internal static class DefJsonSerializer
             if (!first)
                 builder.Append(',');
             first = false;
-            SerializeValue(entry.Key, builder, visited, depth + 1);
+            SerializeValue(entry.Key, builder, visited, depth + 1, declaredKeyType);
             builder.Append(':');
-            SerializeValue(entry.Value, builder, visited, depth + 1);
+            SerializeValue(entry.Value, builder, visited, depth + 1, declaredValueType);
         }
         builder.Append('}');
     }
@@ -196,10 +199,21 @@ internal static class DefJsonSerializer
         Type type,
         StringBuilder builder,
         HashSet<object> visited,
-        int depth)
+        int depth,
+        Type? declaredType)
     {
         builder.Append('{');
         bool first = true;
+
+        // 多态标记置于对象键首：位置确定，diff 基线可精确核对。
+        if (PolymorphicTypeMarker.ShouldEmit(declaredType, type))
+        {
+            AppendQuoted(builder, PolymorphicTypeMarker.Key);
+            builder.Append(':');
+            AppendQuoted(builder, PolymorphicTypeMarker.GetName(type));
+            first = false;
+        }
+
         foreach (var field in PublicFieldCache.Get(type))
         {
             if (field.Name.StartsWith("<", StringComparison.Ordinal))
@@ -213,7 +227,7 @@ internal static class DefJsonSerializer
 
             try
             {
-                SerializeValue(field.GetValue(value), builder, visited, depth + 1);
+                SerializeValue(field.GetValue(value), builder, visited, depth + 1, field.FieldType);
             }
             catch
             {

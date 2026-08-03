@@ -124,7 +124,8 @@ internal static class DefCommands
 
     /// <summary>
     /// 递归收集 JSON 中所有"属性名以 Class 结尾且值为字符串"的字段值，
-    /// 作为 Def 通往 C# 类型的桥接线索（thingClass/compClass/workerClass/hediffClass…）。
+    /// 以及 DataMod 多态对象标记 "$type" 的字符串值（PolymorphicTypeMarker 输出），
+    /// 作为 Def 通往 C# 类型的桥接线索（thingClass/compClass/workerClass/hediffClass… 与多态对象类型）。
     /// </summary>
     private static void CollectClassFields(JsonElement element, List<string> classNames)
     {
@@ -133,8 +134,10 @@ internal static class DefCommands
             case JsonValueKind.Object:
                 foreach (var property in element.EnumerateObject())
                 {
-                    if (property.Name.EndsWith("Class", StringComparison.Ordinal)
-                        && property.Value.ValueKind == JsonValueKind.String)
+                    // "$type" 与 DataMod PolymorphicTypeMarker.Key 一致，修改时必须同步两侧。
+                    if (property.Value.ValueKind == JsonValueKind.String
+                        && (property.Name.EndsWith("Class", StringComparison.Ordinal)
+                            || property.Name == "$type"))
                     {
                         var className = property.Value.GetString();
                         if (!string.IsNullOrEmpty(className))

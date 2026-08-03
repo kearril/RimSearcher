@@ -33,6 +33,8 @@ Export content reflects runtime state; the following limits are by design:
 | Language | `label`/`description` are in the game language at export time; the original XML text no longer exists in-process (already translated). Switch the game language before exporting |
 | Abstract defs invisible | `Abstract="true"` templates are never instantiated — no runtime object exists, so they are not in the database |
 | Field policy | Public + private data fields mirror the game deserializer: excludes `[Unsaved(allowLoading:false)]`, compiler-generated (`<` prefix) and delegate fields; runtime fields the game did not mark (caches/back-references) appear as `{}`, raw values, or `"$cyclic_ref"` |
+| Export determinism | Cross-session exports are **not** byte-identical: runtime-variant fields (random seeds like `ThingSetMakerDef.root.nextSeed`, runtime caches like `ExpansionDef.cachedBG`) change per session. `$type` markers and all XML-derived content are deterministic |
+| Polymorphic types | Objects whose runtime type differs from the declared type (or whose declared type is abstract/interface) carry the runtime type name: a `"$type"` first key in `full_data`, and a `<path>.$type` row in `field_values` (e.g. `genStep.$type`). Def references keep defName-only; null polymorphic fields and non-polymorphic objects have no marker. Class names are **not** FTS-indexed — reverse lookup: `find <path> $type <class>` or `values $type` |
 | Depth | `full_data` hard-capped at 100 (`"$truncated"` beyond; real data reaches 29, never triggered); `field_values` retrieval depth 4 — paths like `stages[0].statOffsets[0].value` are reachable; think-tree nodes below level 3: use `get` to read `full_data` |
 | Numeric format | float/double use G7/G15 significant digits (extreme-precision truncation is a known feature); `NaN`/`±Infinity` are quoted strings; bools are lowercase `true`/`false`; `find` value matching and `values` path matching are case-sensitive (`find` path matching goes through LIKE and is case-insensitive for ASCII) |
 | Path matching | `find`/`values` `fieldPath` matches literally as a suffix (`%`/`_` are escaped, not wildcards) |
@@ -144,7 +146,7 @@ rimsearcher get <defName> [--type T] [--brief] [--field <path>]
 
 **Output** (default): Full `full_data` JSON object — the complete Def serialization.
 
-**Output** (--brief): `{def_name, def_type, label, mod_name, package_id, classes[]}` — every string field whose name ends in `Class` (thingClass, compClass, workerClass, hediffClass, …), the def's C# bridge clues for feeding the decompiler. Type-agnostic and recursion-deep; entries are deduplicated and sorted. When no `*Class` fields exist, stderr prints `Hint: no *Class fields found; try 'fields <defName> --type <T>'` and `classes[]` stays empty.
+**Output** (--brief): `{def_name, def_type, label, mod_name, package_id, classes[]}` — every string field whose name ends in `Class` (thingClass, compClass, workerClass, hediffClass, …) plus polymorphic object types (`$type` markers, e.g. a genStep's runtime class), the def's C# bridge clues for feeding the decompiler. Type-agnostic and recursion-deep; entries are deduplicated and sorted. When neither exists, stderr prints `Hint: no *Class fields found; try 'fields <defName> --type <T>'` and `classes[]` stays empty.
 
 **Output** (--field): the extracted JSON element as-is (string values include quotes, objects/arrays are raw JSON).
 
@@ -326,7 +328,7 @@ Tool-behavior quirks that look like failures but are by design. If a result seem
 - **`fields` order is natural, not lexicographic**: numeric path segments compare by value (`genSteps[2]` before `genSteps[10]`).
 - **`find`/`values` `fieldPath` is a literal suffix**: `%`/`_` are escaped, not wildcards; `find` values are exact (`=`), case-sensitive, canonically formatted (bools lowercase).
 - **`values` path matching is case-sensitive** (BINARY on `field_path_rev`), while `find` path matching goes through LIKE and is case-insensitive for ASCII — `values statOffsets[0].value` excludes `equippedStatOffsets[0].value` rows (different case), whereas `find statOffsets[0].value <v>` includes them.
-- **`--brief` empty `classes[]` is a legal result**: the def has no `*Class` string fields (stderr prints a hint); use `fields` instead.
+- **`--brief` empty `classes[]` is a legal result**: the def has no `*Class` string fields or `$type` markers (stderr prints a hint); use `fields` instead.
 
 ---
 

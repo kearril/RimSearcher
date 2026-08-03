@@ -12,6 +12,8 @@ namespace RimSearcher.DataMod.Reflection;
 /// 深度上限 4（覆盖 stages[i].statOffsets[i].value 等 mod 开发高频路径，
 /// 深度 4 的对象其标量叶子可达路径深度 5）、单 Def 上限 20000 条（达上限返回 true 供导出方记录），
 /// 噪声字段与 modContentPack 前缀被过滤；标量一律用不变量文化格式（bool 小写）。
+/// 多态对象（运行时类型 ≠ 声明类型，或声明类型为抽象/接口）输出 "&lt;path&gt;.$type" 类型行，
+/// 仅入库不进 FTS 文本（类名分词会产出通用 token 污染搜索，反查由 find/values 精确面承担）。
 /// </summary>
 internal static class DefFieldExtractor
 {
@@ -46,7 +48,7 @@ internal static class DefFieldExtractor
     {
         var visited = new HashSet<object>();
         int count = 0;
-        ExtractRecursive(def, defId, string.Empty, inserts, nullInserts, allTexts, visited, 0, ref count);
+        ExtractRecursive(def, defId, string.Empty, inserts, nullInserts, allTexts, visited, 0, ref count, null);
         return count >= MaxValuesPerDef;
     }
 
@@ -59,7 +61,8 @@ internal static class DefFieldExtractor
         List<string> allTexts,
         HashSet<object> visited,
         int depth,
-        ref int count)
+        ref int count,
+        Type? declaredType)
     {
         if (value == null || depth > MaxDepth || count >= MaxValuesPerDef)
             return;
@@ -80,18 +83,28 @@ internal static class DefFieldExtractor
         {
             if (value is IList list)
             {
-                ExtractList(list, defId, pathPrefix, inserts, nullInserts, allTexts, visited, depth, ref count);
+                ExtractList(list, defId, pathPrefix, inserts, nullInserts, allTexts, visited, depth, ref count, PolymorphicTypeMarker.GetDeclaredElementType(type));
                 return;
             }
 
             if (value is IDictionary dictionary)
             {
-                ExtractDictionary(dictionary, defId, pathPrefix, inserts, nullInserts, allTexts, visited, depth, ref count);
+                var (_, declaredValueType) = PolymorphicTypeMarker.GetDeclaredDictionaryTypes(type);
+                ExtractDictionary(dictionary, defId, pathPrefix, inserts, nullInserts, allTexts, visited, depth, ref count, declaredValueType);
                 return;
             }
 
             if (ReflectionTraversalPolicy.IsExcludedType(type))
                 return;
+
+            // 多态类型行只入库不进 FTS：类名分词会产出 "power"/"shield" 等通用 token 污染搜索，
+            // 反查由 find/values 的精确面承担（与 null 值不进全文的既有通道一致）。
+            if (PolymorphicTypeMarker.ShouldEmit(declaredType, type))
+            {
+                if (!TryAddValue(defId, $"{pathPrefix}.{PolymorphicTypeMarker.Key}",
+                        PolymorphicTypeMarker.GetName(type), inserts, null, ref count))
+                    return;
+            }
 
             ExtractObjectFields(value, type, defId, pathPrefix, inserts, nullInserts, allTexts, visited, depth, ref count);
         }
@@ -111,7 +124,8 @@ internal static class DefFieldExtractor
         List<string> allTexts,
         HashSet<object> visited,
         int depth,
-        ref int count)
+        ref int count,
+        Type? declaredElementType)
     {
         for (int index = 0; index < list.Count && count < MaxValuesPerDef; index++)
         {
@@ -144,7 +158,7 @@ internal static class DefFieldExtractor
             }
             else if (item != null && item.GetType().IsClass)
             {
-                ExtractRecursive(item, defId, itemPath, inserts, nullInserts, allTexts, visited, depth + 1, ref count);
+                ExtractRecursive(item, defId, itemPath, inserts, nullInserts, allTexts, visited, depth + 1, ref count, declaredElementType);
             }
         }
     }
@@ -158,7 +172,8 @@ internal static class DefFieldExtractor
         List<string> allTexts,
         HashSet<object> visited,
         int depth,
-        ref int count)
+        ref int count,
+        Type? declaredValueType)
     {
         foreach (DictionaryEntry entry in dictionary)
         {
@@ -194,7 +209,7 @@ internal static class DefFieldExtractor
             }
             else if (entry.Value != null && entry.Value.GetType().IsClass)
             {
-                ExtractRecursive(entry.Value, defId, entryPath, inserts, nullInserts, allTexts, visited, depth + 1, ref count);
+                ExtractRecursive(entry.Value, defId, entryPath, inserts, nullInserts, allTexts, visited, depth + 1, ref count, declaredValueType);
             }
         }
     }
@@ -260,7 +275,7 @@ internal static class DefFieldExtractor
             }
             else
             {
-                ExtractRecursive(fieldValue, defId, fieldPath, inserts, nullInserts, allTexts, visited, depth + 1, ref count);
+                ExtractRecursive(fieldValue, defId, fieldPath, inserts, nullInserts, allTexts, visited, depth + 1, ref count, field.FieldType);
             }
         }
     }
@@ -283,7 +298,7 @@ internal static class DefFieldExtractor
         string fieldPath,
         string fieldValue,
         List<(int DefId, string FieldPath, string FieldValue)> inserts,
-        List<string> allTexts,
+        List<string>? allTexts,
         ref int count)
     {
         if (count >= MaxValuesPerDef)
@@ -299,7 +314,7 @@ internal static class DefFieldExtractor
                 return true;
         }
 
-        allTexts.Add(fieldValue);
+        allTexts?.Add(fieldValue);
         inserts.Add((defId, fieldPath, fieldValue));
         count++;
         return true;
