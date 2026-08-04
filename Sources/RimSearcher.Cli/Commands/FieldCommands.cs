@@ -19,9 +19,22 @@ internal static class FieldCommands
             if (results.Count == 0)
             {
                 // null 查询 0 命中 = 该路径确实无空字段（旧库缺表由全局过滤器报错，版本捆绑不降级）。
-                Console.Error.WriteLine(value == "null"
-                    ? "Hint: no null-field matches for this path suffix"
-                    : $"Hint: no exact matches. Try fuzzy search: rimsearcher search \"{value}\"");
+                if (value == "null")
+                {
+                    Console.Error.WriteLine("Hint: no null-field matches for this path suffix");
+                }
+                else
+                {
+                    // 建议的命令必须可执行：FTS 不接受命名空间点号，取末段（类名 token 形态）；
+                    // 其余 FTS 运算符字符用引号短语兜底，保证 "search <值>" 不报语法错误。
+                    var fuzzyValue = value;
+                    var lastDot = fuzzyValue.LastIndexOf('.');
+                    if (lastDot >= 0)
+                        fuzzyValue = fuzzyValue[(lastDot + 1)..];
+                    if (fuzzyValue.IndexOfAny(new[] { '"', '*', '^', '(', ')', ':', '-' }) >= 0)
+                        fuzzyValue = $"\"{fuzzyValue}\"";
+                    Console.Error.WriteLine($"Hint: no exact matches. Try fuzzy search: rimsearcher search {fuzzyValue}");
+                }
                 if (fieldPath.Contains('.') && !fieldPath.Contains('['))
                     Console.Error.WriteLine(
                         "Hint: field paths match literally as a suffix — nested list paths need their index segment " +
