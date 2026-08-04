@@ -62,13 +62,15 @@ CLI 为其提供全文检索——两者相辅相成，一个负责 C# 源码，
 
 ### 4. 配置 CLI
 
-在 `rimsearcher.exe` 所在目录打开终端，执行：
+将 `rimsearcher.exe` 所在目录加入系统 PATH（命令行伪代码）：
 
 ```bash
-.\rimsearcher install
+reg add "HKCU\Environment" /v Path /t REG_EXPAND_SZ /d "<原Path值>;<rimsearcher.exe所在目录>" /f
 ```
 
-注意：Windows PowerShell 不会从当前目录解析裸命令名，首次安装需带 `.\` 前缀（CMD 中 `rimsearcher install` 亦可）。完成这一步后，该exe文件请不要随意移动位置，否则系统会找不到对应的path，或者移动后重复该操作
+> 必须使用 `REG_EXPAND_SZ` 类型以保留 `%VAR%` 变量展开；写入前可用 `reg query "HKCU\Environment" /v Path` 查看原值。
+
+配置完成后，若移动 `rimsearcher.exe`，需重新配置 PATH。
 
 ### 5. 配置 AI 技能
 
@@ -77,6 +79,8 @@ CLI 为其提供全文检索——两者相辅相成，一个负责 C# 源码，
 
 ### 6.完成
 重启后，可以开始进行测试和使用了
+
+> **平台支持**：Windows 为开发/测试环境；CLI 与 DataMod 代码兼容 macOS/Linux（理论支持），但暂无 Mac/Linux 发布产物，且未经实测。
 
 ---
 
@@ -96,7 +100,7 @@ CLI 为其提供全文检索——两者相辅相成，一个负责 C# 源码，
 | 组件 | 说明                                                                                                               |
 |---|--------------------------------------------------------------------------------------------------------------------|
 | **RimSearcher.DataMod** | 游戏def数据导出模组。运行时将当前加载的 Def 数据导出为 `defs.db`，label 和 description 为游戏当前语言的文本；      |
-| **rimsearcher CLI** | .NET 命令行工具。10 个命令：`search` `list` `get` `find` `fields` `values` `types` `mods` `install` `check update` |
+| **rimsearcher CLI** | .NET 命令行工具。9 个命令：`search` `list` `get` `find` `fields` `values` `types` `mods` `check update` |
 | **rimsearcher Skill** | AI 助手技能文件。教 AI 使用 CLI + 反编译 MCP 定位和分析 RimWorld 源码，含反幻觉规则与数据验证指令                  |
 
 ## 构建
@@ -143,8 +147,6 @@ rimsearcher values <fieldPath> [--type T] [--limit N]
 rimsearcher types
 # mods — Mod 统计
 rimsearcher mods
-# install — 安装到 PATH (windows)
-rimsearcher install
 # check update — 检查更新：查询 GitHub Release 是否有新版
 rimsearcher check update
 ```

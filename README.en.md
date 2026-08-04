@@ -54,13 +54,15 @@ When the export finishes, place the generated `defs.db` in the same directory as
 
 ### 4. Configure the CLI
 
-Open a terminal in the directory containing `rimsearcher.exe` and run:
+Add the directory containing `rimsearcher.exe` to the system PATH (command-line pseudocode):
 
 ```bash
-.\rimsearcher install
+reg add "HKCU\Environment" /v Path /t REG_EXPAND_SZ /d "<current-Path-value>;<rimsearcher.exe-directory>" /f
 ```
 
-Note: Windows PowerShell does not resolve bare command names from the current directory — use the `.\` prefix on first install (CMD accepts `rimsearcher install` too). After this step, don't move the exe file — the system's PATH entry would point to the old location. If you do move it, just run the command again.
+> Must use the `REG_EXPAND_SZ` type to preserve `%VAR%` variable expansion; check the current value first with `reg query "HKCU\Environment" /v Path` if needed.
+
+After configuring, if you move `rimsearcher.exe`, you must reconfigure the PATH.
 
 ### 5. Configure AI Skills
 
@@ -69,6 +71,8 @@ Download [skills.zip](https://raw.githubusercontent.com/kearril/RimSearcher/mast
 ### 6. Done
 
 Restart and start testing and using the tool.
+
+> **Platform support**: Windows is the development/testing environment; the CLI and DataMod code are compatible with macOS/Linux (theoretically supported), but no Mac/Linux release artifacts are provided and they have not been tested there.
 
 ---
 
@@ -87,7 +91,7 @@ Restart and start testing and using the tool.
 | Component | Description |
 |---|---|
 | **RimSearcher.DataMod** | In-game Def data export mod. Exports the currently loaded Def data to `defs.db`; labels and descriptions use the game's current language |
-| **rimsearcher CLI** | .NET command-line tool. 10 commands: `search` `list` `get` `find` `fields` `values` `types` `mods` `install` `check update` |
+| **rimsearcher CLI** | .NET command-line tool. 9 commands: `search` `list` `get` `find` `fields` `values` `types` `mods` `check update` |
 | **rimsearcher Skill** | AI assistant skill files. Teach the AI to locate and analyze RimWorld source code using the CLI + decompilation MCP, with anti-hallucination rules and data-verification instructions |
 
 ## Building
@@ -132,8 +136,6 @@ rimsearcher values <fieldPath> [--type T] [--limit N]
 rimsearcher types
 # mods — mod statistics
 rimsearcher mods
-# install — add to PATH (Windows)
-rimsearcher install
 # check update — check for a newer GitHub Release
 rimsearcher check update
 ```
