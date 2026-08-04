@@ -152,8 +152,9 @@ internal sealed class DefRepository
                 """;
             command.Parameters.AddWithValue("@pattern", SearchSubstring.LikePattern(substringTerm));
             QueryParameters.AddFilters(command, type, mod);
-            // 多取若干行供去重损耗（token 行重叠会消耗 SQL limit），填满结果上限即停。
-            command.Parameters.AddWithValue("@limit", limit);
+            // 多取 token 命中数作去重损耗：补充行与 FTS 命中行重叠会消耗 SQL limit 槽位，
+            // 超限由下方 results.Count >= limit 的 break 截断。
+            command.Parameters.AddWithValue("@limit", limit + tokenKeys.Count);
 
             using var reader = command.ExecuteReader();
             while (reader.Read())

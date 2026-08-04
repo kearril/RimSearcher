@@ -18,6 +18,10 @@ internal sealed class FieldRepository
 
     public IReadOnlyList<FieldMatch> Find(string fieldPath, string value, string? type, string? mod, int limit)
     {
+        // 空路径在反转前缀范围下无意义（NextBoundary 需非空），与 GetValues 同一契约。
+        if (fieldPath.Length == 0)
+            throw new ArgumentException("field path must not be empty");
+
         // null 查询走独立表（空字段不是值）；CLI 与 DataMod 捆绑发布，只兼容新导出库。
         if (string.Equals(value, "null", StringComparison.Ordinal))
             return FindNull(fieldPath, type, mod, limit);
@@ -28,14 +32,17 @@ internal sealed class FieldRepository
             SELECT d.def_name, d.def_type, d.label, d.mod_name, d.package_id, fv.field_path, fv.field_value
             FROM defs d
             JOIN field_values fv ON d.id = fv.def_id
-            WHERE fv.field_path LIKE '%' || @path ESCAPE '\'
+            WHERE fv.field_path_rev >= @low AND fv.field_path_rev < @high
               AND fv.field_value = @value
               AND (@type IS NULL OR d.def_type = @type)
               AND (@mod IS NULL OR d.mod_name = @mod)
             ORDER BY d.def_type, d.def_name
             LIMIT @limit
             """;
-        command.Parameters.AddWithValue("@path", EscapeLikePattern(fieldPath));
+        // 反转前缀范围查询（与 GetValues 同构）：BINARY 大小写敏感，与 values 语义统一。
+        var reversed = ReversePath(fieldPath);
+        command.Parameters.AddWithValue("@low", reversed);
+        command.Parameters.AddWithValue("@high", NextBoundary(reversed));
         command.Parameters.AddWithValue("@value", value);
         QueryParameters.AddFilters(command, type, mod);
         command.Parameters.AddWithValue("@limit", limit);
@@ -54,7 +61,8 @@ internal sealed class FieldRepository
 
     /// <summary>
     /// null 查询：null_fields 表（空字段）∪ field_values 中真实值为 "null" 字符串的行。
-    /// 两个来源均按后缀匹配；要求新导出库（无 null 表时 SQLite 直接报错，版本捆绑不降级）。
+    /// 两个来源均按反转前缀范围匹配（与 GetValues 同构，BINARY 大小写敏感）；
+    /// 要求新导出库（无 null 表时 SQLite 直接报错，版本捆绑不降级）。
     /// </summary>
     private IReadOnlyList<FieldMatch> FindNull(string fieldPath, string? type, string? mod, int limit)
     {
@@ -66,11 +74,11 @@ internal sealed class FieldRepository
                 SELECT nf.def_id, fp.path
                 FROM null_fields nf
                 JOIN field_paths fp ON fp.id = nf.path_id
-                WHERE fp.path LIKE '%' || @path ESCAPE '\'
+                WHERE fp.path_rev >= @low AND fp.path_rev < @high
                 UNION
                 SELECT fv.def_id, fv.field_path
                 FROM field_values fv
-                WHERE fv.field_path LIKE '%' || @path ESCAPE '\'
+                WHERE fv.field_path_rev >= @low AND fv.field_path_rev < @high
                   AND fv.field_value = 'null'
             ) x
             JOIN defs d ON d.id = x.def_id
@@ -79,7 +87,9 @@ internal sealed class FieldRepository
             ORDER BY d.def_type, d.def_name
             LIMIT @limit
             """;
-        command.Parameters.AddWithValue("@path", EscapeLikePattern(fieldPath));
+        var reversed = ReversePath(fieldPath);
+        command.Parameters.AddWithValue("@low", reversed);
+        command.Parameters.AddWithValue("@high", NextBoundary(reversed));
         QueryParameters.AddFilters(command, type, mod);
         command.Parameters.AddWithValue("@limit", limit);
 
