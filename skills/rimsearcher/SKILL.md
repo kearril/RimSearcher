@@ -16,7 +16,7 @@ Two tools are your hands: the rimsearcher CLI queries the runtime-merged Def tru
 rimsearcher search <keyword> [--type T] [--mod M] [--limit N] [--count] [--name-only]
 ```
 - `<keyword>`: a single bare word also matches name/label substrings (`raid` finds `RaidEnemy`)
-- class names are indexed (camelCase folds to one token): `search comprottable` finds every Def using CompRottable — the class→Defs reverse query; fragments don't match (`rottable` → 0)
+- FTS matches whole tokens only (camelCase is not split): `search comprottable` reverse-hits every Def using CompRottable; fragment `rottable` → 0
 - `--name-only`: match the def_name column only
 - `rank`: FTS5 relevance score — negative, more negative = more relevant; token matches only
 
@@ -35,10 +35,10 @@ rimsearcher get <defName> [--type T] [--brief] [--field <path>]
 - `get` returns the full JSON — long output may be truncated by the host's display
 
 ```bash
-# Reverse lookup: exact match at a known path — which Defs hold this value at that exact index
+# Reverse lookup: exact match at a known path (value + index position)
 rimsearcher find <fieldPath> <value> [--type T] [--mod M] [--limit N]
 ```
-- `<fieldPath>`: literal suffix match; nested lists need their index segment (`pawnGroupMakers[0].kindDef`); the index position varies per Def (`comps[0]` empty ≠ no references — try neighboring indexes or `search <class name>`)
+- `<fieldPath>`: literal suffix match; lists need their index (`pawnGroupMakers[0].kindDef`); the index position varies per Def — `comps[0]` empty ≠ no references, try neighboring indexes or `search <class name>`
 - `<value>`: exact match, full name required (`RimWorld.CompShield`), partial names → use `search`; case-sensitive (bools lowercase); may be `null` (query empty fields)
 
 ```bash
@@ -53,7 +53,7 @@ rimsearcher fields <defName> --type <T> [--limit N] [--filter <glob>]
 rimsearcher values <fieldPath> [--type T] [--limit N]
 ```
 - `<fieldPath>`: literal suffix match, same as `find`
-- bare field names aggregate across list depths: `values compClass` = the full comp-class vocabulary
+- bare field names aggregate across list depths: `values compClass` → the full comp-class vocabulary
 
 ```bash
 # Type statistics: all def_types with counts
