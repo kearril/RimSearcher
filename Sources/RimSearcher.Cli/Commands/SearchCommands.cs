@@ -1,4 +1,5 @@
 using System;
+using System.Linq;
 using ConsoleAppFramework;
 using RimSearcher.Cli.Infrastructure;
 using RimSearcher.Cli.Queries;

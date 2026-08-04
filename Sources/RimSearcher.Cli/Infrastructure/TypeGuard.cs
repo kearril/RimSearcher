@@ -1,3 +1,4 @@
+using System;
 using RimSearcher.Cli.Queries;
 
 namespace RimSearcher.Cli.Infrastructure;
