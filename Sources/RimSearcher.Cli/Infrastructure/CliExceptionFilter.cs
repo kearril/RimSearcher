@@ -25,7 +25,10 @@ internal sealed class CliExceptionFilter(ConsoleAppFilter next) : ConsoleAppFilt
         }
         catch (OperationCanceledException)
         {
-            // 用户中断（如 Ctrl+C），保持框架默认行为，不输出错误。
+            // 防御路径：当前命令均无 CancellationToken 参数，框架（Emitter）不为它们生成取消机制，
+            // Ctrl+C 由 OS 默认处理直接终止进程；仅未来带 token 的命令取消时走到这里。
+            // 显式中断码 130（128+SIGINT 惯例），脚本可区分中断与成功完成。
+            Environment.ExitCode = 130;
         }
         catch (SqliteException exception)
         {

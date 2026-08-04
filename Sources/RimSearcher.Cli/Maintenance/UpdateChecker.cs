@@ -2,7 +2,6 @@ using System;
 using System.Net;
 using System.Net.Http;
 using System.Reflection;
-using RimSearcher.Cli.Infrastructure;
 
 namespace RimSearcher.Cli.Maintenance;
 
@@ -30,15 +29,26 @@ internal static class UpdateChecker
         }
         catch (Exception exception)
         {
+            // SKILL.md:72 契约 "Ignore check failures"：check update 在 agent 每次任务启动时执行，
+            // 失败不打断分析。stderr 保留人类可见性，自然 return（exit 0）保脚本语义。
             Console.Error.WriteLine($"Failed to check for updates: {exception.Message}");
-            Environment.Exit(ExitCodes.Error);
+            return;
         }
 
         var latestVersion = tag.StartsWith('v') ? tag[1..] : tag;
         var assemblyVersion = Assembly.GetExecutingAssembly().GetName().Version!;
         var currentVersion = $"{assemblyVersion.Major}.{assemblyVersion.Minor}.{assemblyVersion.Build}";
 
-        if (new Version(latestVersion) <= new Version(currentVersion))
+        // tag 来自任意 GitHub Release：预发布、空或短段 tag 会让 new Version 抛 FormatException 崩溃，
+        // 解析失败与 catch 一样走忽略路径（契约 Ignore check failures），只提示不打断。
+        if (!Version.TryParse(latestVersion, out var latestParsed)
+            || !Version.TryParse(currentVersion, out var currentParsed))
+        {
+            Console.Error.WriteLine($"Failed to check for updates: invalid version tag '{tag}'");
+            return;
+        }
+
+        if (latestParsed <= currentParsed)
         {
             Console.WriteLine($"rimsearcher is up to date ({currentVersion})");
             return;
