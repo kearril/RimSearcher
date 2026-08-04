@@ -17,7 +17,6 @@ rimsearcher search <keyword> [--type T] [--mod M] [--limit N] [--count] [--name-
 ```
 - `<keyword>`: a single bare word also matches name/label substrings (`raid` finds `RaidEnemy`)
 - FTS matches whole tokens only (camelCase is not split): `search comprottable` reverse-hits every Def using CompRottable; fragment `rottable` → 0
-- `--name-only`: match the def_name column only
 - `rank`: FTS5 relevance score — negative, more negative = more relevant; token matches only
 
 ```bash
@@ -82,7 +81,7 @@ End-to-end understanding of a mechanic.
 1. `search` → candidates; proceed when unique, ask only on real conflicts; if nothing hits, switch to `list --type` browsing
 2. `get --brief` → the class-name bridge; no class names → `fields` for residual clues, or full `get` — its def-reference fields are the bridge
 3. Decompile the class names → source pipeline: `search_symbols` → `resolve_member_id` → `get_members_of_type` (signatures first) → `get_decompiled_source` (`get_source_slice` for large types); relationships via `find_callers`/`find_callees`/`find_usages`; errors carry `candidates`/`hints` (sometimes empty) — follow them or the error text, never retry the same call.
-   > Param names: decompilation & member queries always take `memberId` (type targets too — pass `memberId` with the `:T`-suffixed ID); exceptions: type-member enumeration (`get_members_of_type`/`list_members`) takes `typeId`, `find_callers`/`find_callees` take `methodId`, `search_*` take `query`, `search_string_literals` takes `pattern`; the rest are self-descriptive, check the schema
+   > Param names: decompilation & member queries always take `memberId` (type targets too — pass `memberId` with the `:T`-suffixed ID); exceptions: type-member enumeration (`get_members_of_type`/`list_members`) takes `typeId`, `find_callers`/`find_callees` take `methodId`, `search_*` take `query`, `search_string_literals` takes `pattern`; the rest are self-descriptive
 4. Verify: Def values ↔ decompiled formula cross-check
 
 ### Reverse Lookup
@@ -94,6 +93,7 @@ User gives a C# type directly, skip CLI: `list_contexts`/`status` to confirm the
 ## Verify
 
 Check: does the decompiled formula reference the fields you extracted, and are the values consistent under the formula's computation path? If not → the field path or target is wrong, retrace.
+Float trailing digits are the exact binary value — `0.0500000007` equals the source literal `0.05f`; treat them as the literal when computing.
 Skip: `types`/`mods`/`values`, purely structural questions (no formula to check).
 
 ## Pitfalls
