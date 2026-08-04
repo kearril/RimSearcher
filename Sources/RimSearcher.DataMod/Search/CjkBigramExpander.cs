@@ -5,8 +5,8 @@ namespace RimSearcher.DataMod.Search;
 internal static class CjkBigramExpander
 {
     /// <summary>
-    /// 将文本中的连续 CJK 字符段展开为相邻二元组，提升 FTS5 中文检索命中率。
-    /// 例如 "护盾腰带" 展开为 "护盾 盾腰 腰带"。
+    /// 保留原文并追加连续 CJK 字符段的相邻二元组，辅助 FTS5 中文分词，提升检索命中率。
+    /// 例如 "护盾腰带" 输出 "护盾腰带 护盾 盾腰 腰带"。
     /// </summary>
     public static string Expand(string text)
     {

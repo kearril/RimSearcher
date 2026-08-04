@@ -22,11 +22,14 @@ internal static class DefFieldExtractor
 
     // 注意：以下名单与 CLI 的 FieldRepository.NoiseFieldNames 内容一致，修改时必须同步两侧。
     // 两侧语义不同：DataMod 按完整路径精确过滤，CLI 按路径末段匹配过滤。
+    // defName/label/description 为每 def 必有的基类字段：defs 表列与 FTS 三列已覆盖，
+    // 再写入 field_values 冗余 3 行/def 且 description 大文本双份存储，剔除后字段树更干净。
     private static readonly HashSet<string> SkipFieldNames = new()
     {
         "debugRandomId", "defNameHash", "generated",
         "ignoreConfigErrors", "ignoreIllegalLabelCharacterConfigError",
-        "index", "shortHash"
+        "index", "shortHash",
+        "defName", "label", "description"
     };
 
     private static readonly HashSet<string> SkipFieldPrefixes = new()
@@ -307,6 +310,8 @@ internal static class DefFieldExtractor
     {
         if (count >= MaxValuesPerDef)
             return false;
+        // 空串视为无值：不产生 field_values 行，也不进 null_fields，
+        // 与 null 字段（可寻址空字段，支撑 find/values 补集查询）语义区分。
         if (string.IsNullOrEmpty(fieldValue))
             return true;
         if (SkipFieldNames.Contains(fieldPath))

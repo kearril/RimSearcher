@@ -194,7 +194,8 @@ public static class DefExporter
         }
 
         tx.Commit();
-        Log($"Wrote {totalDefs} Defs");
+        // totalDefs 在去重检查前自增（含跳过项），日志按实际写入行数 defId 报告。
+        Log($"Wrote {defId} Defs");
 
         conn.Close();
     }
@@ -204,8 +205,13 @@ public static class DefExporter
     /// 版本号编码为 user_version 整数（major*10000+minor*100+patch，patch ≤ 99）；
     /// 与 CLI 的 DatabaseConnectionFactory.EncodeVersion 算法一致，修改时必须同步两侧。
     /// </summary>
-    private static int EncodeVersion(Version version) =>
-        version.Major * 10000 + version.Minor * 100 + version.Build;
+    private static int EncodeVersion(Version version)
+    {
+        // patch > 99 时编码与下一 minor 碰撞（3.1.100 → 30200 == 3.2.0），抛异常由导出流程 catch 显示失败。
+        if (version.Build > 99)
+            throw new InvalidOperationException($"Version patch {version.Build} exceeds 99 — encoding collides with the next minor (major*10000+minor*100+build)");
+        return version.Major * 10000 + version.Minor * 100 + version.Build;
+    }
 
     private static int CountDefs(IEnumerable<Type> defTypes)
     {

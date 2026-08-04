@@ -34,7 +34,9 @@ internal static class FieldValueWriter
     /// 路径反转（字符级）：供 field_path_rev 列使用，
     /// 使 CLI 的后缀匹配可转为反转前缀范围查询走索引。
     /// 与 CLI 的 FieldRepository.ReversePath 算法一致，修改时必须同步两侧。
-    /// 路径字符集为 ASCII（C# 标识符 + [ ] . 数字），无代理对问题。
+    /// 字段名虽为 ASCII，但字典 key 可为任意文本：非 BMP 字符以代理对存储，
+    /// 字符级反转会拆散代理对，UTF-8 编码时损坏为 U+FFFD。
+    /// 当前不处理（罕见场景），算法保持与 CLI 侧一致。
     /// </summary>
     internal static string ReversePath(string path)
     {
