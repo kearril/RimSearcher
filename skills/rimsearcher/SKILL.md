@@ -38,7 +38,7 @@ rimsearcher get <defName> [--type T] [--brief] [--field <path>]
 # Reverse lookup: exact match at a known path (value + index position)
 rimsearcher find <fieldPath> <value> [--type T] [--mod M] [--limit N]
 ```
-- `<fieldPath>`: literal suffix match; lists need their index (`pawnGroupMakers[0].kindDef`); the index position varies per Def — `comps[0]` empty ≠ no references, try neighboring indexes or `search <class name>`
+- `<fieldPath>`: literal suffix match (case-sensitive); lists need their index (`pawnGroupMakers[0].kindDef`); the index position varies per Def — `comps[0]` empty ≠ no references, try neighboring indexes or `search <class name>`
 - `<value>`: exact match, full name required (`RimWorld.CompShield`), partial names → use `search`; case-sensitive (bools lowercase); may be `null` (query empty fields)
 
 ```bash
