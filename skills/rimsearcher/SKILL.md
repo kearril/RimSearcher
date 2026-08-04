@@ -103,6 +103,7 @@ Skip: `types`/`mods`/`values`, purely structural questions (no formula to check)
 - `find_usages` empty ≠ no references: the index misses usages (triangulate: string-literal search / DefDatabase reverse lookup / decompiled getter reads); or the context has no IL (`get_il` reports no_il_body → verify the context is the real game assembly)
 - `..cctor` often decompiles to an empty body: get static initial values from `get_il`
 - a guessed memberId silently resolves to another member's source: only use IDs returned by the tool; verify the member name/signature
+- unknown parameters are silently ignored: filters/options look active but aren't (guessed names like `query`/`namespace`/`typeFilter` do nothing) — align param names with the tool definition before calling (the schema is always visible)
 
 ## Guardrails
 
