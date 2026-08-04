@@ -137,6 +137,7 @@ internal static class DefFieldExtractor
                 : $"{pathPrefix}[{index}]";
             var item = list[index];
 
+            // 容器内 null 不收集（无分支命中即跳过）：路径不可寻址，空字段语义由顶层 null_fields 承担。
             if (item is string text)
             {
                 if (!TryAddValue(defId, itemPath, text, inserts, allTexts, ref count))
@@ -184,6 +185,7 @@ internal static class DefFieldExtractor
                 return;
 
             string key = entry.Key == null ? string.Empty : ToScalarText(entry.Key) ?? string.Empty;
+            // 容器内 null 不收集（无分支命中即跳过）：路径不可寻址，空字段语义由顶层 null_fields 承担。
             string entryPath = string.IsNullOrEmpty(pathPrefix)
                 ? key
                 : $"{pathPrefix}.{key}";
@@ -241,6 +243,7 @@ internal static class DefFieldExtractor
                 : $"{pathPrefix}.{field.Name}";
 
             object? fieldValue;
+            // GetValue 反射异常（属性 getter 抛错等）跳过该字段：单字段失败不中断整个 Def 提取。
             try { fieldValue = field.GetValue(value); }
             catch { continue; }
 
