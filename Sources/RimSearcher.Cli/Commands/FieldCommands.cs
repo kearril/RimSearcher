@@ -7,6 +7,10 @@ namespace RimSearcher.Cli.Commands;
 
 internal static class FieldCommands
 {
+    private const string IndexSegmentHint =
+        "Hint: field paths match literally as a suffix — nested list paths need their index segment " +
+        "(e.g. 'pawnGroupMakers[0].kindDef'); or filter with 'get <def> --field <path>'";
+
     public static void Register(ConsoleApp.ConsoleAppBuilder app, FieldRepository fieldRepository, DefRepository defRepository, JsonOutput output)
     {
         app.Add("find", ([Argument] string fieldPath, [Argument] string value, string? type = null, string? mod = null, int limit = 50) =>
@@ -36,9 +40,7 @@ internal static class FieldCommands
                     Console.Error.WriteLine($"Hint: no exact matches. Try fuzzy search: rimsearcher search {fuzzyValue}");
                 }
                 if (fieldPath.Contains('.') && !fieldPath.Contains('['))
-                    Console.Error.WriteLine(
-                        "Hint: field paths match literally as a suffix — nested list paths need their index segment " +
-                        "(e.g. 'pawnGroupMakers[0].kindDef'); or filter with 'get <def> --field <path>'");
+                    Console.Error.WriteLine(IndexSegmentHint);
                 // 无结果非零退出（stdout 仍输出 []），脚本可用退出码区分"未找到"与"查询失败"。
                 Environment.ExitCode = ExitCodes.NotFound;
             }
@@ -74,9 +76,7 @@ internal static class FieldCommands
                     $"Hint: no values for '{fieldPath}' — the path may not exist in any def, " +
                     "or --type filtered everything (try without --type)");
                 if (fieldPath.Contains('.') && !fieldPath.Contains('['))
-                    Console.Error.WriteLine(
-                        "Hint: field paths match literally as a suffix — nested list paths need their index segment " +
-                        "(e.g. 'pawnGroupMakers[0].kindDef'); or filter with 'get <def> --field <path>'");
+                    Console.Error.WriteLine(IndexSegmentHint);
                 // 无结果非零退出（stdout 仍输出 []）：与 find/get 的 NotFound 契约统一。
                 Environment.ExitCode = ExitCodes.NotFound;
             }

@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics.CodeAnalysis;
 using System.Linq;
 using System.Text.Json;
 using ConsoleAppFramework;
@@ -18,6 +19,18 @@ internal static class DefCommands
             if (TypeGuard.RejectUnknown(type, repository))
                 return;
 
+            // 四个出口（类型解析/brief/field/full）共用的未命中处理：错误消息 + 相似名指引 + NotFound 退出码。
+            // DoesNotReturn：内部 Environment.Exit 后不返回，调用方流分析可收窄可空状态（如 source 判空后使用）。
+            [DoesNotReturn]
+            void WriteNotFound(string name, string? defType)
+            {
+                Console.Error.WriteLine(defType == null
+                    ? $"Error: no Def found with defName '{name}'"
+                    : $"Error: no Def found with defName '{name}' and type '{defType}'");
+                WriteNotFoundHint(repository, name, defType);
+                Environment.Exit(ExitCodes.NotFound);
+            }
+
             // 参数互斥：--brief 与 --field 都是提取视图，同时给出为参数错误。
             if (brief && field != null)
             {
@@ -30,9 +43,7 @@ internal static class DefCommands
                 var types = repository.FindTypes(defName);
                 if (types.Count == 0)
                 {
-                    Console.Error.WriteLine($"Error: no Def found with defName '{defName}'");
-                    WriteNotFoundHint(repository, defName, null);
-                    Environment.Exit(ExitCodes.NotFound);
+                    WriteNotFound(defName, null);
                 }
                 if (types.Count > 1)
                 {
@@ -49,9 +60,7 @@ internal static class DefCommands
                 var source = repository.GetBriefSource(defName, type!);
                 if (source == null)
                 {
-                    Console.Error.WriteLine($"Error: no Def found with defName '{defName}' and type '{type}'");
-                    WriteNotFoundHint(repository, defName, type);
-                    Environment.Exit(ExitCodes.NotFound);
+                    WriteNotFound(defName, type);
                 }
 
                 // 统一提取所有 *Class 桥接字段：不过滤 def_type、不限嵌套深度，
@@ -79,9 +88,7 @@ internal static class DefCommands
                 var source = repository.GetBriefSource(defName, type!);
                 if (source == null)
                 {
-                    Console.Error.WriteLine($"Error: no Def found with defName '{defName}' and type '{type}'");
-                    WriteNotFoundHint(repository, defName, type);
-                    Environment.Exit(ExitCodes.NotFound);
+                    WriteNotFound(defName, type);
                 }
 
                 using var document = JsonDocument.Parse(source.FullData);

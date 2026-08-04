@@ -256,7 +256,7 @@ internal sealed class FieldRepository
 
     /// <summary>
     /// 前缀范围上界：末字符 +1（BINARY 字符串比较，[low, high) 恰含全部以 low 为前缀的值）。
-    /// 路径末字符为 ASCII，无 \uFFFF 溢出。
+    /// 末字符理论上可为非 ASCII（字典 key）：char 溢出仅当末字符为 \uFFFF，实际不可达，不处理。
     /// </summary>
     private static string NextBoundary(string prefix)
     {

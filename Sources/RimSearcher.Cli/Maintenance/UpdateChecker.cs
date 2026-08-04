@@ -13,7 +13,8 @@ internal static class UpdateChecker
 
     public static void Check()
     {
-        using var http = new HttpClient(new HttpClientHandler { AllowAutoRedirect = false });
+        // 失败路径的等待上限：默认 100s 对"检查失败即忽略"的契约太长，10s 足够 GitHub 重定向往返。
+        using var http = new HttpClient(new HttpClientHandler { AllowAutoRedirect = false }) { Timeout = TimeSpan.FromSeconds(10) };
         http.DefaultRequestHeaders.UserAgent.ParseAdd(ApplicationName);
 
         string tag = null!;
