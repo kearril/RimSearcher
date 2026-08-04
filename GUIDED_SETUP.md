@@ -52,15 +52,18 @@ Tell the user to enable **RimSearcherDataMod** in the in-game Mod list.
 
 ### Step 4: Configure CLI
 
-Add the directory containing `rimsearcher.exe` to the system PATH. Guide the user to run (pseudocode):
+Guide the user through adding the directory containing `rimsearcher.exe` to the system PATH. You are the assistant they are asking — walk them through it yourself:
+
+- Windows: Settings → System → About → Advanced system settings → Environment Variables → user variable `Path` → Edit → New → paste the exe directory
+- If you have terminal/registry access, you may perform the change directly (e.g. `reg add "HKCU\Environment" /v Path /t REG_EXPAND_SZ /d "<new value>" /f` — keep the REG_EXPAND_SZ type so `%VAR%` entries keep expanding)
+
+Once configured, verify by opening a **new** terminal (PATH changes do not apply to already-open terminals) and running:
 
 ```bash
-reg add "HKCU\Environment" /v Path /t REG_EXPAND_SZ /d "<current-Path-value>;<rimsearcher.exe-directory>" /f
+rimsearcher --version
 ```
 
-Emphasize that the command **must** use the `REG_EXPAND_SZ` type to preserve `%VAR%` variable expansion.
-
-Remind the user that if they move `rimsearcher.exe` afterwards, the PATH must be reconfigured.
+It should print the current version number. Remind the user that if they move `rimsearcher.exe` afterwards, the PATH must be reconfigured.
 
 ### Step 5: Place Skill Files
 

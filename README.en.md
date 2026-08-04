@@ -54,13 +54,15 @@ When the export finishes, place the generated `defs.db` in the same directory as
 
 ### 4. Configure the CLI
 
-Add the directory containing `rimsearcher.exe` to the system PATH (command-line pseudocode):
+Add the directory containing `rimsearcher.exe` to the system PATH. If you are not sure how, ask your AI assistant for help.
+
+Once configured, run in any terminal:
 
 ```bash
-reg add "HKCU\Environment" /v Path /t REG_EXPAND_SZ /d "<current-Path-value>;<rimsearcher.exe-directory>" /f
+rimsearcher --version
 ```
 
-> Must use the `REG_EXPAND_SZ` type to preserve `%VAR%` variable expansion; check the current value first with `reg query "HKCU\Environment" /v Path` if needed.
+It should print the current version number.
 
 After configuring, if you move `rimsearcher.exe`, you must reconfigure the PATH.
 
@@ -71,8 +73,6 @@ Download [skills.zip](https://raw.githubusercontent.com/kearril/RimSearcher/mast
 ### 6. Done
 
 Restart and start testing and using the tool.
-
-> **Platform support**: Windows is the development/testing environment; the CLI and DataMod code are compatible with macOS/Linux (theoretically supported), but no Mac/Linux release artifacts are provided and they have not been tested there.
 
 ---
 
@@ -120,7 +120,7 @@ Contributions of your RimWorld mod development experience to the Skill repositor
 ## Command Reference
 
 ```bash
-# search — full-text search: fuzzy keyword matching (mixed CN/EN, wildcards & boolean ops; a single bare word also matches defname/label substrings; --name-only restricts to the name column)
+# search — full-text search: fuzzy keyword matching (mixed CN/EN, wildcards & boolean ops; a single bare word also matches def_name/label substrings; --name-only restricts to the name column)
 rimsearcher search <keyword> [--type T] [--mod M] [--limit N] [--count] [--name-only]
 # list — paginated browsing: list Defs by type/mod
 rimsearcher list [--type T] [--mod M] [--limit N] [--offset N] [--total]

@@ -7,7 +7,7 @@
 > **设计哲学**：把工具的错误变成知识的输入——让模型从错误中学习。
 > 错误即文档、失败即教学：每个限制与失败路径都设计为模型的学习素材。
 
-#### RimSearcher V3 全面焕新重置，工具从该版本开始，舍弃了过去的mcp架构，转而使用skills+cli的设计模式，这带来了更好的性能，更低的占用以及更智能的ai决策，并且现在支持模组环境的代码分析了！
+#### RimSearcher V3 全面焕新重置，工具从该版本开始，舍弃了过去的mcp架构，转而使用skills+cli的设计模式，这带来了更好的性能，更低的占用以及更智能的 AI 决策，并且现在支持模组环境的代码分析了！
 
 ## 介绍
 
@@ -62,25 +62,25 @@ CLI 为其提供全文检索——两者相辅相成，一个负责 C# 源码，
 
 ### 4. 配置 CLI
 
-将 `rimsearcher.exe` 所在目录加入系统 PATH（命令行伪代码）：
+将 `rimsearcher.exe` 所在目录加入系统 PATH。若不清楚如何操作，请教你的 AI 助手。
+
+配置成功后，在任意终端执行：
 
 ```bash
-reg add "HKCU\Environment" /v Path /t REG_EXPAND_SZ /d "<原Path值>;<rimsearcher.exe所在目录>" /f
+rimsearcher --version
 ```
 
-> 必须使用 `REG_EXPAND_SZ` 类型以保留 `%VAR%` 变量展开；写入前可用 `reg query "HKCU\Environment" /v Path` 查看原值。
+应显示当前版本号。
 
 配置完成后，若移动 `rimsearcher.exe`，需重新配置 PATH。
 
 ### 5. 配置 AI 技能
 
-解压 [下载 skills.zip](https://raw.githubusercontent.com/kearril/RimSearcher/master/skills.zip) 获取的文件（该链接始终指向仓库最新版），将 `skills/rimsearcher/` 放入你使用的 AI 助手的 skills 目录。
+下载并解压 [skills.zip](https://raw.githubusercontent.com/kearril/RimSearcher/master/skills.zip)（该链接始终指向仓库最新版），将 `skills/rimsearcher/` 放入你使用的 AI 助手的 skills 目录。
 重启 AI 客户端后生效。
 
-### 6.完成
-重启后，可以开始进行测试和使用了
-
-> **平台支持**：Windows 为开发/测试环境；CLI 与 DataMod 代码兼容 macOS/Linux（理论支持），但暂无 Mac/Linux 发布产物，且未经实测。
+### 6. 完成
+重启 AI 客户端后，可以开始进行测试和使用了
 
 ---
 
@@ -92,7 +92,7 @@ reg add "HKCU\Environment" /v Path /t REG_EXPAND_SZ /d "<原Path值>;<rimsearche
 | **rimsearcher Skill** | [下载 skills.zip](https://raw.githubusercontent.com/kearril/RimSearcher/master/skills.zip)，解压后覆盖 skills 目录。                           |
 | **RimSearcher.DataMod** | 从 [Releases](https://github.com/kearril/RimSearcher/releases/latest) 下载新版 `RimSearcher_DataMod.zip`，解压替换原来的模组，并重新导出数据库 |
 
-> 由于 skills 文件是影响ai决策的重要文件，可能频繁更新优化，
+> 由于 skills 文件是影响 AI 决策的重要文件，可能频繁更新优化，
 > 因此 skills 不跟随 Release 发布。如何判断 skills 是否有更新？看这个标徽或者页面顶部的 ![Skills Update Time](https://img.shields.io/endpoint?url=https%3A%2F%2Fkearril.github.io%2FRimSearcher%2Fskills-update.json) 徽章；它显示 `skills.zip` 最后一次更新的 UTC+8 时间。显示的时间比本地文件新就说明有更新。
 
 ## 组件
@@ -131,7 +131,7 @@ dotnet build Sources/RimSearcher.DataMod/ -c Release
 ## 功能说明
 
 ```bash
-# search — 全文搜索：关键词模糊匹配（中英文，支持通配符与布尔组合；单个裸词另匹配defname/lab；--name-only 限定名称列）
+# search — 全文搜索：关键词模糊匹配（中英文，支持通配符与布尔组合；单个裸词另匹配 def_name/label 子串；--name-only 限定名称列）
 rimsearcher search <keyword> [--type T] [--mod M] [--limit N] [--count] [--name-only]
 # list — 分页浏览：按类型/Mod 列出 Def
 rimsearcher list [--type T] [--mod M] [--limit N] [--offset N] [--total]
