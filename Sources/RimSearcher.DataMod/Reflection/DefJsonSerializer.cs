@@ -125,7 +125,7 @@ internal static class DefJsonSerializer
                 builder.Append(boolean ? "true" : "false");
                 return true;
             case int or long or short or byte or sbyte or uint or ulong or ushort:
-                builder.Append(value);
+                builder.Append(((IFormattable)value).ToString(null, CultureInfo.InvariantCulture));
                 return true;
             case float single:
                 AppendNonFiniteAsQuoted(single, builder);
@@ -148,14 +148,15 @@ internal static class DefJsonSerializer
     /// <summary>
     /// 输出浮点数值；非有限数输出带引号字符串（"NaN"/"Infinity"/"-Infinity"），
     /// 保留信息且产出合法 JSON（RFC 8259：非有限数应序列化为 null 或字符串）。
-    /// 数值格式保持 G（float G7 / double G15，与输出契约一致）。
+    /// 数值格式：float 用 G9（RimWorld Scribe_Values.Look 保存契约实证，镜像对齐），
+    /// double 用 G17（保证 round-trip）；net472 下无精度 "G" 默认 G7/G15，精度不足会失真。
     /// </summary>
     private static void AppendNonFiniteAsQuoted(float value, StringBuilder builder)
     {
         if (float.IsNaN(value)) { AppendQuoted(builder, "NaN"); return; }
         if (float.IsPositiveInfinity(value)) { AppendQuoted(builder, "Infinity"); return; }
         if (float.IsNegativeInfinity(value)) { AppendQuoted(builder, "-Infinity"); return; }
-        builder.Append(value.ToString("G", CultureInfo.InvariantCulture));
+        builder.Append(value.ToString("G9", CultureInfo.InvariantCulture));
     }
 
     private static void AppendNonFiniteAsQuoted(double value, StringBuilder builder)
@@ -163,7 +164,7 @@ internal static class DefJsonSerializer
         if (double.IsNaN(value)) { AppendQuoted(builder, "NaN"); return; }
         if (double.IsPositiveInfinity(value)) { AppendQuoted(builder, "Infinity"); return; }
         if (double.IsNegativeInfinity(value)) { AppendQuoted(builder, "-Infinity"); return; }
-        builder.Append(value.ToString("G", CultureInfo.InvariantCulture));
+        builder.Append(value.ToString("G17", CultureInfo.InvariantCulture));
     }
 
     private static void SerializeList(IList list, StringBuilder builder, HashSet<object> visited, int depth, Type? declaredElementType)

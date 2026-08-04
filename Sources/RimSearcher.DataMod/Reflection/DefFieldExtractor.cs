@@ -282,12 +282,16 @@ internal static class DefFieldExtractor
 
     /// <summary>
     /// 标量统一格式化：bool 小写，数值与枚举用不变量文化（小数点恒为 "."）。
-    /// 与 DefJsonSerializer 的 simple-value 输出规则对齐（G7/G15 精度不变）。
+    /// 与 DefJsonSerializer 的 simple-value 输出规则对齐（float G9 / double G17，保证 round-trip）。
     /// </summary>
     private static string? ToScalarText(object value)
     {
         if (value is bool boolean)
             return boolean ? "true" : "false";
+        if (value is float single)
+            return single.ToString("G9", CultureInfo.InvariantCulture);
+        if (value is double number)
+            return number.ToString("G17", CultureInfo.InvariantCulture);
         if (value is IFormattable formattable)
             return formattable.ToString(null, CultureInfo.InvariantCulture);
         return value.ToString();
