@@ -64,7 +64,7 @@ internal static class DefCommands
                     .OrderBy(name => name, StringComparer.Ordinal)
                     .ToArray();
                 if (distinctClasses.Length == 0)
-                    Console.Error.WriteLine($"Hint: no *Class fields found; try 'fields {defName} --type {type}'");
+                    Console.Error.WriteLine($"Hint: no class bridge found; try 'fields {defName} --type {type}' or full 'get' — def-reference fields are the bridge");
 
                 output.Write(new BriefDef(
                     source.DefName, source.DefType, source.Label, source.ModName,
