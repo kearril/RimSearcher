@@ -93,6 +93,14 @@ User gives a C# type directly, skip CLI: activate context → search the class �
 Check: does the decompiled formula reference the fields you extracted, and are the values consistent under the formula's computation path? If not → the field path or target is wrong, retrace.
 Skip: `types`/`mods`/`values`, purely structural questions (no formula to check).
 
+## Pitfalls
+
+### DecompilerServer
+
+- `find_usages` empty ≠ no references: the index misses usages (triangulate: string-literal search / DefDatabase reverse lookup / decompiled getter reads); or the context has no IL (`get_il` reports no_il_body → verify the context is the real game assembly)
+- `..cctor` often decompiles to an empty body: get static initial values from `get_il`
+- a guessed memberId silently resolves to another member's source: only use IDs returned by the tool; verify the member name/signature
+
 ## Guardrails
 
 **NEVER:**
