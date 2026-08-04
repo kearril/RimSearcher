@@ -11,11 +11,31 @@ English | [简体中文](README.md)
 
 ## Introduction
 
-RimSearcher specializes in the **Def data layer** — XML definitions, field structures, and type relationships. C# source analysis is delegated to [DecompilerServer](https://github.com/pardeike/DecompilerServer), a decompilation MCP tool built for Unity assemblies. It decompiles loaded .NET assemblies directly, offering type search, member signature browsing, IL-level inspection, call-chain tracing, and cross-version method body comparison — letting the AI see not "maybe-existing APIs" but the code that actually runs. As its design goal states: *"I can inspect the actual code that runs"*.
+RimSearcher is a professional RimWorld source-analysis toolchain built for AI use: it combines query tools — the CLI and the in-game mod — with a skill that teaches the model how to use them. It is not just a tool; it is also a teacher.
 
-The Skill file ties both together: CLI locates the Def → extracts C# type names → DecompilerServer reads the source, forming a complete analysis pipeline.
+RimSearcher specializes in the **Def data layer** (XML definitions, field structures, type relationships): the in-game DataMod exports every Def of the current mod environment to a SQLite database, and the CLI provides full-text search and exact reverse lookup over it. C# source analysis is delegated to [DecompilerServer](https://github.com/pardeike/DecompilerServer) — it decompiles loaded .NET assemblies directly: type search, member signatures, IL-level inspection, call-chain tracing, cross-version comparison — letting the AI see not "maybe-existing APIs" but the code that actually runs. As its design goal states: *"I can inspect the actual code that runs"*.
 
-Support for multi-mod environments comes from two layers working together: DecompilerServer can load the vanilla game and any mod's `.dll` assemblies side by side, each with its own context alias, so the AI can inspect source and IL of multiple assemblies in parallel to pinpoint hooks and compatibility boundaries. Meanwhile, RimSearcher's DataMod exports the current mod environment's Def data to a SQLite database in-game, and the CLI provides full-text search over it — one handles C# source, the other handles Def-data export and querying.
+The Skill file ties both together into an analysis pipeline: CLI locates the Def → extracts C# type names → DecompilerServer reads the source.
+
+Multi-mod environments are supported by two layers working together: DecompilerServer loads the vanilla game and any mod's assemblies side by side (each with its own context alias — inspect source and IL in parallel to pinpoint hooks and compatibility boundaries); DataMod exports the current mod environment's Def data for the CLI to query — one handles code, the other handles data, complementing each other.
+
+## A Light on the Detour — how errors become signposts
+
+A traveler does not ask about the detour — they ask about the light at the end of it.
+
+The tool turns every detour into a signpost: when a query finds nothing, it speaks to point the way — one path, or another; when the syntax loses its voice, it leads you to the door of precision; when versions fall out of step, it tells you how to begin again. Not finding something is not failing — "nothing lies on this path" is a message, not a rebuke.
+
+Yet the most dangerous thing is not thunder, but silence. Hollow constructors, mispointed IDs, references that are absent yet real — what trial and error can never teach, the best of it is charted, like a sailor's map marking the reefs of those who came before, so that those who follow need not run aground.
+
+The tool points the way, the model walks it, and the walker comes to know the way — this is the breathing of the project.
+
+During development, we found that what troubles large models is never errors themselves — it is the silence of not knowing where things went wrong. So we designed this tool from the model's perspective, clearing pitfalls for it, making every error meaningful — every error tells the model what to do next, and every such hint is the result of our optimization through extensive sample analysis:
+
+When a query finds nothing, the hint suggests the next step; when the syntax is invalid, it points to exact-match commands; when a name is misspelled, it offers similar-name candidates... And "not found" is also a result rather than a failure — exit 2 means an expected empty result; the model need not mistake it for an error.
+
+But the tool can only hint at errors it can perceive itself. Problems that are silent even to the tool — ones the model can never discover through trial and error — we distill the high-frequency ones into the skill, so the model can avoid them in advance.
+
+We believe: the tool's errors should become the model's experience, not its cost. Errors are documentation; failures are lessons.
 
 ## Quick Start
 
@@ -68,7 +88,7 @@ After configuring, if you move `rimsearcher.exe`, you must reconfigure the PATH.
 
 ### 5. Configure AI Skills
 
-Download [skills.zip](https://raw.githubusercontent.com/kearril/RimSearcher/master/skills.zip) (this link always points to the latest version in the repository), extract it, and place `skills/rimsearcher/` into your AI assistant's skills directory. Restart the AI client to activate.
+Download [skills.zip](https://raw.githubusercontent.com/kearril/RimSearcher/master/skills.zip) (this link always points to the latest version in the repository), extract it, and place `skills/rimsearcher/` into your AI assistant's skills directory.
 
 ### 6. Done
 
@@ -94,6 +114,42 @@ Restart and start testing and using the tool.
 | **rimsearcher CLI** | .NET command-line tool. 9 commands: `search` `list` `get` `find` `fields` `values` `types` `mods` `check update` |
 | **rimsearcher Skill** | AI assistant skill files. Teach the AI to locate and analyze RimWorld source code using the CLI + decompilation MCP, with anti-hallucination rules and data-verification instructions |
 
+## Command Reference
+
+### CLI Commands
+
+```bash
+# search — full-text fuzzy search
+rimsearcher search <keyword> [--type T] [--mod M] [--limit N] [--count] [--name-only]
+# list — paginated browsing
+rimsearcher list [--type T] [--mod M] [--limit N] [--offset N] [--total]
+# get — precise lookup
+rimsearcher get <defName> [--type T] [--brief] [--field <path>]
+# find — exact field-value reverse lookup
+rimsearcher find <fieldPath> <value> [--type T] [--mod M] [--limit N]
+# fields — field tree
+rimsearcher fields <defName> --type <T> [--limit N] [--filter <glob>]
+# values — distinct values of a field path
+rimsearcher values <fieldPath> [--type T] [--limit N]
+# types — def type statistics
+rimsearcher types
+# mods — mod statistics
+rimsearcher mods
+# check update — check for updates
+rimsearcher check update
+```
+
+### AI integration (Skill)
+
+The Skill is where the toolchain's soul lives — it teaches the AI how to analyze, not just what tools to use.
+
+Different questions demand different paths: a quick lookup, or a full end-to-end analysis of a mechanic. Once a path is chosen, the conclusion is bound by methodology — every Def value is cross-checked against the decompiled formula, so each conclusion traces back to command output or source code itself. The greatest risk in analysis is not error but fabrication: the skill forbids guessing and inventing, and when information is insufficient, the AI explicitly marks its uncertainty and states what is missing — honesty is the first principle of analysis.
+
+### DataMod — in-game export
+
+RimSearcher.DataMod is an in-game mod that exports all Def data of the current mod environment to a SQLite database for the CLI to query; the database is version-locked to the CLI, so re-export after updating either side.
+
+
 ## Building
 
 ### Prerequisites
@@ -117,37 +173,6 @@ dotnet build Sources/RimSearcher.DataMod/ -c Release
 
 Contributions of your RimWorld mod development experience to the Skill repository are welcome. If you have common analysis workflows, frequent hook points, or compatibility experience with specific mods, submit a PR to extend the Skill files and make the AI assistant more knowledgeable about RimWorld — which benefits every RimSearcher user.
 
-## Command Reference
-
-```bash
-# search — full-text search: fuzzy keyword matching (mixed CN/EN, wildcards & boolean ops; a single bare word also matches def_name/label substrings; --name-only restricts to the name column)
-rimsearcher search <keyword> [--type T] [--mod M] [--limit N] [--count] [--name-only]
-# list — paginated browsing: list Defs by type/mod
-rimsearcher list [--type T] [--mod M] [--limit N] [--offset N] [--total]
-# get — precise lookup: fetch one Def by defName (--brief extracts *Class names and polymorphic $type, --field extracts one field)
-rimsearcher get <defName> [--type T] [--brief] [--field <path>]
-# find — reverse lookup: exact field-value match (which Defs reference a C# class)
-rimsearcher find <fieldPath> <value> [--type T] [--mod M] [--limit N]
-# fields — field tree: inspect one Def's full nested structure (--filter supports path glob)
-rimsearcher fields <defName> --type <T> [--limit N] [--filter <glob>]
-# values — value enumeration: distinct values of a field path
-rimsearcher values <fieldPath> [--type T] [--limit N]
-# types — def type statistics
-rimsearcher types
-# mods — mod statistics
-rimsearcher mods
-# check update — check for a newer GitHub Release
-rimsearcher check update
-```
-
-### AI integration (Skill)
-
-The Skill files teach the AI to analyze RimWorld mechanics with the CLI and the decompilation MCP along a standard pipeline, with built-in anti-hallucination rules and data-trust verification.
-
-### DataMod — in-game export
-
-RimSearcher.DataMod is an in-game mod that exports all Def data of the current mod environment to a SQLite database for the CLI to query; the database is version-locked to the CLI, so re-export after updating either side.
-
 ## Runtime Dependencies
 
 - [.NET 10 Runtime](https://dotnet.microsoft.com/download/dotnet/10.0) — runtime for the CLI and DecompilerServer
@@ -160,11 +185,9 @@ RimSearcher.DataMod is an in-game mod that exports all Def data of the current m
 
 ## Disclaimer
 
-RimSearcher only reads and analyzes game data installed locally on your machine. It bundles and distributes no RimWorld game files or third-party mod assets.
-
-When analyzing mods with this tool, note that the analyzed mods are bound by their respective licenses. Derivative work based on analysis results must comply with each mod's open-source terms. Exported data may contain mod authors' creative content (Def names, description text, etc.), and the copyright belongs to the original authors.
-
-This project is not affiliated with Ludeon Studios. RimWorld is a trademark of Ludeon Studios.
+- RimSearcher only reads and analyzes game data installed locally on your machine. It bundles and distributes no RimWorld game files or third-party mod assets.
+- Analyzed mods are bound by their respective licenses; derivative work based on analysis results must comply with each mod's open-source terms.
+- This project is not affiliated with Ludeon Studios. RimWorld is a trademark of Ludeon Studios.
 
 ## License
 
