@@ -24,7 +24,7 @@ internal static class JsonFieldNavigator
     {
         value = default;
         var segments = Parse(path);
-        if (segments == null)
+        if (segments == null || segments.Count == 0)
             return NavigateStatus.MalformedPath;
 
         var current = root;
@@ -51,6 +51,7 @@ internal static class JsonFieldNavigator
 
     /// <summary>
     /// 解析路径为属性/索引段序列；非法格式（空段、未闭合 [、非数字索引）返回 null。
+    /// 空串/纯点路径解析为空段列表，由 TryNavigate 归为 MalformedPath（而非 Ok(root)）。
     /// 属性名与索引段均可紧随点号或直接相邻（a.b[0][1] 合法）。
     /// </summary>
     private static List<Segment>? Parse(string path)

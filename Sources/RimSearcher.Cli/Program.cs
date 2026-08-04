@@ -8,6 +8,9 @@ using RimSearcher.Cli.Infrastructure;
 using RimSearcher.Cli.Queries;
 
 Console.OutputEncoding = Encoding.UTF8;
+// stderr 默认继承系统代码页（如 CP437），hint 内插的 defName 等可能含非 ASCII；
+// Console.Error 无 OutputEncoding 属性，用 StreamWriter 替换并设 AutoFlush 保证即时写出。
+Console.SetError(new StreamWriter(Console.OpenStandardError()) { AutoFlush = true });
 
 // 框架错误输出重定向到 stderr，保证"数据走 stdout、错误走 stderr"的契约。
 ConsoleApp.LogError = message => Console.Error.WriteLine(message);

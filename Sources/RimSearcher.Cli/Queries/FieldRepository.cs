@@ -244,7 +244,8 @@ internal sealed class FieldRepository
 
     /// <summary>
     /// 反转路径（字符级）；与 DataMod 的 FieldValueWriter.ReversePath 算法一致，修改时必须同步两侧。
-    /// 路径字符集为 ASCII（C# 标识符 + [ ] . 数字），无代理对问题。
+    /// 字段名本身为 ASCII，但路径可含字典 key（任意文本，CJK 等）；非 BMP 段（代理对）按字符级反转会损坏
+    /// （UTF-8 编码为 U+FFFD）。当前不处理（罕见），算法保持不变。
     /// </summary>
     private static string ReversePath(string path)
     {
@@ -297,6 +298,7 @@ internal sealed class FieldRepository
     {
         "debugRandomId", "defNameHash", "generated",
         "ignoreConfigErrors", "ignoreIllegalLabelCharacterConfigError",
-        "index", "shortHash"
+        "index", "shortHash",
+        "defName", "label", "description"
     };
 }
