@@ -82,7 +82,7 @@ End-to-end understanding of a mechanic.
 1. `search` → candidates; proceed when unique, ask only on real conflicts; if nothing hits, switch to `list --type` browsing
 2. `get --brief` → the class-name bridge; no class names → `fields` for residual clues, or full `get` — its def-reference fields are the bridge
 3. Decompile the class names → source pipeline: `search_symbols` → `resolve_member_id` → `get_members_of_type` (signatures first) → `get_decompiled_source` (`get_source_slice` for large types); relationships via `find_callers`/`find_callees`/`find_usages`; errors carry `candidates`/`hints` (sometimes empty) — follow them or the error text, never retry the same call.
-   > Param names: `search_*` take `query`, `search_string_literals` takes `pattern`, `get_members_of_type` takes `typeId`, `find_callers`/`find_callees` take `methodId`, everything else takes `memberId`
+   > Param names: by operand view — members take `memberId`, methods `methodId`, types `typeId`, searches `query`/`pattern`; the rest are self-descriptive (e.g. `baseTypeId`, `ns`), check the schema when unsure
 4. Verify: Def values ↔ decompiled formula cross-check
 
 ### Reverse Lookup
