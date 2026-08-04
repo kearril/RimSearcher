@@ -70,6 +70,8 @@ rimsearcher mods
 
 Before starting a task, run `rimsearcher check update`; if a newer version exists, tell the user (do not interrupt the analysis). Ignore check failures.
 
+CLI `Hint:` output is guidance — follow it (pick one option when several are offered); on failure, pivot instead of retrying.
+
 Match the shortest path; when unsure, default to Full Analysis.
 
 ### Quick Lookup
