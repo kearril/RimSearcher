@@ -22,7 +22,7 @@ StatisticsCommands.Register(app, new StatisticsRepository(connectionFactory), ou
 MaintenanceCommands.Register(app);
 
 // 命令集合与下方 Register 调用一一对应，新增命令时需同步。
-string[] knownCommands = ["search", "list", "get", "find", "fields", "values", "types", "mods", "install", "check update"];
+string[] knownCommands = ["search", "list", "get", "find", "fields", "values", "types", "mods", "check update"];
 
 // 帮助输出：规范入口 -h/--help（含无参数）。自控输出以附加文档指引
 if (args.Length == 0 || (args.Length == 1 && (args[0] == "-h" || args[0] == "--help")))
