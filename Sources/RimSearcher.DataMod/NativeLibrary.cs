@@ -92,7 +92,12 @@ internal static class NativeLibrary
         if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
             return ("e_sqlite3.dll", LoadLibrary);
         if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
-            return ("libe_sqlite3.dylib", path => Dlopen(path, RtldNow));
+        {
+            // Apple Silicon 需 arm64 dylib（x64 在 arm64 进程中不可加载——Rosetta 不转译动态库混架构加载）。
+            return RuntimeInformation.OSArchitecture == Architecture.Arm64
+                ? ("libe_sqlite3.arm64.dylib", path => Dlopen(path, RtldNow))
+                : ("libe_sqlite3.dylib", path => Dlopen(path, RtldNow));
+        }
         return ("libe_sqlite3.so", path => Dlopen(path, RtldNow));
     }
 

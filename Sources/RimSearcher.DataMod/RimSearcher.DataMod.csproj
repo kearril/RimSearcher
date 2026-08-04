@@ -30,6 +30,10 @@
       <Copy SourceFiles="@(NativeRuntime)"
             DestinationFolder="..\..\RimSearcher_DataMod\Native\"
             SkipUnchangedFiles="true" />
+      <!-- arm64 dylib 与 x64 同名冲突，显式命名（NativeLibrary 按架构选文件名） -->
+      <Copy SourceFiles="$(PkgSQLitePCLRaw_lib_e_sqlite3)\runtimes\osx-arm64\native\libe_sqlite3.dylib"
+            DestinationFiles="..\..\RimSearcher_DataMod\Native\libe_sqlite3.arm64.dylib"
+            SkipUnchangedFiles="true" />
     </Target>
 
 </Project>
