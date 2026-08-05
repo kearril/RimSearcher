@@ -22,7 +22,7 @@ internal sealed class FieldRepository
         if (fieldPath.Length == 0)
             throw new ArgumentException("field path must not be empty");
 
-        // null 查询走独立表（空字段不是值）；CLI 与 DataMod 捆绑发布，只兼容新导出库。
+        // null 查询走独立表（空字段不是值）
         if (string.Equals(value, "null", StringComparison.Ordinal))
             return FindNull(fieldPath, type, mod, limit);
 
@@ -62,7 +62,6 @@ internal sealed class FieldRepository
     /// <summary>
     /// null 查询：null_fields 表（空字段）∪ field_values 中真实值为 "null" 字符串的行。
     /// 两个来源均按反转前缀范围匹配（与 GetValues 同构，BINARY 大小写敏感）；
-    /// 要求新导出库（无 null 表时 SQLite 直接报错，版本捆绑不降级）。
     /// </summary>
     private IReadOnlyList<FieldMatch> FindNull(string fieldPath, string? type, string? mod, int limit)
     {
@@ -166,7 +165,7 @@ internal sealed class FieldRepository
             return;
 
         // 只查候选 def_name（值命中 defs.def_name 才有标注意义）：去重后按批 IN 走
-        // idx_defs_name_type 索引，避免每次 fields 都全表扫描 defs（15,964 行）。
+        // idx_defs_name_type 索引，避免每次 fields 都全表扫描。
         var candidates = values.Select(v => v.Value).Distinct(StringComparer.Ordinal).ToList();
         var lookup = new Dictionary<string, List<string>>(StringComparer.Ordinal);
         using (var command = connection.CreateCommand())
@@ -208,7 +207,7 @@ internal sealed class FieldRepository
         using var command = connection.CreateCommand();
         // 后缀匹配转为反转前缀范围查询：走 idx_fv_path_rev 索引；
         // BINARY 比较大小写敏感，与文档声明一致。
-        // field_path_rev 列由 DataMod 导出（捆绑发布必含）。
+        // field_path_rev 列由 DataMod 导出。
         var reversed = ReversePath(fieldPath);
         // UNION 空字段标记："null" 与其他值一同排序、同受 LIMIT 约束。
         // null 分支与普通分支同构（path_rev 反转前缀，BINARY 大小写敏感）——LIKE 会破坏后缀精确匹配契约。
@@ -245,7 +244,7 @@ internal sealed class FieldRepository
     /// <summary>
     /// 反转路径（字符级）；与 DataMod 的 FieldValueWriter.ReversePath 算法一致，修改时必须同步两侧。
     /// 字段名本身为 ASCII，但路径可含字典 key（任意文本，CJK 等）；非 BMP 段（代理对）按字符级反转会损坏
-    /// （UTF-8 编码为 U+FFFD）。当前不处理（罕见），算法保持不变。
+    /// （UTF-8 编码为 U+FFFD）。
     /// </summary>
     private static string ReversePath(string path)
     {
@@ -256,7 +255,7 @@ internal sealed class FieldRepository
 
     /// <summary>
     /// 前缀范围上界：末字符 +1（BINARY 字符串比较，[low, high) 恰含全部以 low 为前缀的值）。
-    /// 末字符理论上可为非 ASCII（字典 key）：char 溢出仅当末字符为 \uFFFF，实际不可达，不处理。
+    /// 末字符理论上可为非 ASCII（字典 key）：char 溢出仅当末字符为 \uFFFF，实际不可达。
     /// </summary>
     private static string NextBoundary(string prefix)
     {

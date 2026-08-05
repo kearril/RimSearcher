@@ -19,7 +19,7 @@ internal static class DefCommands
             if (TypeGuard.RejectUnknown(type, repository))
                 return;
 
-            // 四个出口（类型解析/brief/field/full）共用的未命中处理：错误消息 + 相似名指引 + NotFound 退出码。
+            // 类型解析/brief/field/full 共用的未命中处理：错误消息,相似名指引, NotFound 退出码。
             // DoesNotReturn：内部 Environment.Exit 后不返回，调用方流分析可收窄可空状态（如 source 判空后使用）。
             [DoesNotReturn]
             void WriteNotFound(string name, string? defType)
@@ -119,7 +119,7 @@ internal static class DefCommands
     }
 
     /// <summary>
-    /// 未命中时的方向指引：同类型相似名候选（最多 5 个）+ 抽象 Def 说明——
+    /// 未命中时的方向指引：同类型相似名候选（最多 5 个）+ 抽象 Def 说明
     /// 不解释时调用方会误以为名字错误而转向 XML 排查（抽象模板运行时不存在，与拼写无关）。
     /// </summary>
     private static void WriteNotFoundHint(DefRepository repository, string defName, string? type)

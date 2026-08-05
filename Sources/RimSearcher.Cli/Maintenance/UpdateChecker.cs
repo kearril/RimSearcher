@@ -13,7 +13,7 @@ internal static class UpdateChecker
 
     public static void Check()
     {
-        // 失败路径的等待上限：默认 100s 对"检查失败即忽略"的契约太长，10s 足够 GitHub 重定向往返。
+        // 失败路径的等待上限固定为10s
         using var http = new HttpClient(new HttpClientHandler { AllowAutoRedirect = false }) { Timeout = TimeSpan.FromSeconds(10) };
         http.DefaultRequestHeaders.UserAgent.ParseAdd(ApplicationName);
 
@@ -30,8 +30,7 @@ internal static class UpdateChecker
         }
         catch (Exception exception)
         {
-            // SKILL.md:72 契约 "Ignore check failures"：check update 在 agent 每次任务启动时执行，
-            // 失败不打断分析。stderr 保留人类可见性，自然 return（exit 0）保脚本语义。
+            // 失败不打断分析。stderr 保留可见性，自然 return（exit 0）保脚本语义。
             Console.Error.WriteLine($"Failed to check for updates: {exception.Message}");
             return;
         }

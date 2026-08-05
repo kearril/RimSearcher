@@ -22,7 +22,7 @@ internal static class FieldCommands
             output.Write(results);
             if (results.Count == 0)
             {
-                // null 查询 0 命中 = 该路径确实无空字段（旧库缺表由全局过滤器报错，版本捆绑不降级）。
+                // null 查询 0 命中 = 该路径确实无空字段
                 if (value == "null")
                 {
                     Console.Error.WriteLine("Hint: no null-field matches for this path suffix");

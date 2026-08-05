@@ -52,7 +52,7 @@ internal static class SearchCommands
 
     /// <summary>
     /// 0 命中时的方向指引：单裸词已做过子串补充仍 0 命中，即名字与文本中确实不存在该词，
-    /// 提示拼写检查与浏览路径；复合 FTS 查询未做子串补充，仍提示前缀通配机制。
+    /// 提示拼写检查与浏览路径；复合 FTS 查询未做子串补充，而是提示前缀通配机制。
     /// </summary>
     private static void MaybePrefixWildcardHint(string keyword)
     {

@@ -26,7 +26,6 @@ internal sealed class DatabaseConnectionFactory
         connection.Open();
 
         // 版本认证：CLI 与 DataMod 捆绑发布，只接受同版本导出的库（严格相等）。
-        // 程序集版本缺失时兜底 0（编码后与无版本标记库同值，显式拒绝防静默放行）。
         var cliVersion = EncodeVersion(Assembly.GetExecutingAssembly().GetName().Version ?? new Version(0, 0, 0));
         if (cliVersion == 0)
         {

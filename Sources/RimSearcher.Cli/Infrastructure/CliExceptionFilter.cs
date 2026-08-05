@@ -7,7 +7,7 @@ using Microsoft.Data.Sqlite;
 namespace RimSearcher.Cli.Infrastructure;
 
 /// <summary>
-/// 命令执行异常的统一出口：错误消息写入 stderr、退出码置 1，不向用户泄漏堆栈。
+/// 命令执行异常的统一出口：错误消息写入 stderr、退出码置 1
 /// 参数解析类错误由框架顶层处理，经重定向的 <see cref="ConsoleApp.LogError"/> 同样写入 stderr。
 /// SQLite 错误按错误码分类：FTS 语法（1）、数据库损坏（11/26）、通用（其余）。
 /// </summary>
@@ -27,7 +27,7 @@ internal sealed class CliExceptionFilter(ConsoleAppFilter next) : ConsoleAppFilt
         {
             // 防御路径：当前命令均无 CancellationToken 参数，框架（Emitter）不为它们生成取消机制，
             // Ctrl+C 由 OS 默认处理直接终止进程；仅未来带 token 的命令取消时走到这里。
-            // 显式中断码 130（128+SIGINT 惯例），脚本可区分中断与成功完成。
+            // 显式中断码 130 ，脚本可区分中断与成功完成。
             Environment.ExitCode = 130;
         }
         catch (SqliteException exception)
@@ -46,7 +46,7 @@ internal sealed class CliExceptionFilter(ConsoleAppFilter next) : ConsoleAppFilt
         switch (exception.SqliteErrorCode)
         {
             // 固定 SQL 的 SQLITE_ERROR 有两类来源：FTS MATCH 用户表达式、
-            // null 查询引用独立表（CLI 与 DataMod 捆绑发布，旧库缺表属预期）。
+            // null 查询引用独立表
             // "no such table" 是 SQLite 稳定文案，据此区分缺表（重导指引）与 FTS 语法错误。
             case SqliteError when exception.Message.Contains("no such table", StringComparison.Ordinal):
                 Console.Error.WriteLine(
