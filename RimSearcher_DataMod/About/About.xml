@@ -2,7 +2,7 @@
 <ModMetaData>
 	<name>RimSearcherDataMod</name>
 	<author>极光薄荷糖</author>
-	<modVersion>3.1.3</modVersion>
+	<modVersion>3.1.4</modVersion>
 	<description>Game mod for RimSearcher: exports the currently loaded Def database (defs.db) in-game for the rimsearcher CLI to query. </description>
 	<url>https://github.com/kearril/RimSearcher</url>
 	<supportedVersions>
