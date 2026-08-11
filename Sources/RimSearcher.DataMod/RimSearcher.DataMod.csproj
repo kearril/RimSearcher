@@ -1,39 +1,38 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
-    <PropertyGroup>
-        <TargetFramework>net472</TargetFramework>
-        <ImplicitUsings>enable</ImplicitUsings>
-        <LangVersion>Latest</LangVersion>
-        <Version>3.1.3</Version>
-        <Nullable>enable</Nullable>
-        <Deterministic>true</Deterministic>
-        <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
-        <AppendRuntimeIdentifierToOutputPath>false</AppendRuntimeIdentifierToOutputPath>
-        <OutputPath>..\..\RimSearcher_DataMod/Assemblies</OutputPath>
-        <RestorePackagesWithLockFile>true</RestorePackagesWithLockFile>
-    </PropertyGroup>
+  <PropertyGroup>
+    <TargetFramework>net472</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <LangVersion>Latest</LangVersion>
+    <Version>3.1.3</Version>
+    <Nullable>enable</Nullable>
+    <Deterministic>true</Deterministic>
+    <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
+    <AppendRuntimeIdentifierToOutputPath>false</AppendRuntimeIdentifierToOutputPath>
+    <OutputPath>..\..\RimSearcher_DataMod/Assemblies</OutputPath>
+    <RestorePackagesWithLockFile>true</RestorePackagesWithLockFile>
+  </PropertyGroup>
 
+  <ItemGroup>
+    <PackageReference Include="Krafs.Rimworld.Ref" Version="1.6.4871" />
+    <PackageReference Include="Microsoft.Data.Sqlite.Core" Version="8.0.*" />
+    <PackageReference Include="SQLitePCLRaw.core" Version="2.1.*" />
+    <PackageReference Include="SQLitePCLRaw.provider.dynamic_cdecl" Version="2.1.*" />
+    <PackageReference Include="SQLitePCLRaw.lib.e_sqlite3" Version="2.1.*" ExcludeAssets="all" GeneratePathProperty="true" />
+  </ItemGroup>
+
+  <Target Name="CopySqliteNative" AfterTargets="Build">
     <ItemGroup>
-      <PackageReference Include="Krafs.Rimworld.Ref" Version="1.6.4871" />
-      <PackageReference Include="Microsoft.Data.Sqlite.Core" Version="8.0.*" />
-      <PackageReference Include="SQLitePCLRaw.core" Version="2.1.*" />
-      <PackageReference Include="SQLitePCLRaw.provider.dynamic_cdecl" Version="2.1.*" />
-      <PackageReference Include="SQLitePCLRaw.lib.e_sqlite3" Version="2.1.*" ExcludeAssets="all" GeneratePathProperty="true" />
+      <NativeRuntime Include="$(PkgSQLitePCLRaw_lib_e_sqlite3)\runtimes\win-x64\native\e_sqlite3.dll" />
+      <NativeRuntime Include="$(PkgSQLitePCLRaw_lib_e_sqlite3)\runtimes\linux-x64\native\libe_sqlite3.so" />
+      <NativeRuntime Include="$(PkgSQLitePCLRaw_lib_e_sqlite3)\runtimes\osx-x64\native\libe_sqlite3.dylib" />
     </ItemGroup>
-
-    <Target Name="CopySqliteNative" AfterTargets="Build">
-      <ItemGroup>
-        <NativeRuntime Include="$(PkgSQLitePCLRaw_lib_e_sqlite3)\runtimes\win-x64\native\e_sqlite3.dll" />
-        <NativeRuntime Include="$(PkgSQLitePCLRaw_lib_e_sqlite3)\runtimes\linux-x64\native\libe_sqlite3.so" />
-        <NativeRuntime Include="$(PkgSQLitePCLRaw_lib_e_sqlite3)\runtimes\osx-x64\native\libe_sqlite3.dylib" />
-      </ItemGroup>
-      <Copy SourceFiles="@(NativeRuntime)"
-            DestinationFolder="..\..\RimSearcher_DataMod\Native\"
-            SkipUnchangedFiles="true" />
-      <!-- arm64 dylib 与 x64 同名冲突，显式命名（NativeLibrary 按架构选文件名） -->
-      <Copy SourceFiles="$(PkgSQLitePCLRaw_lib_e_sqlite3)\runtimes\osx-arm64\native\libe_sqlite3.dylib"
-            DestinationFiles="..\..\RimSearcher_DataMod\Native\libe_sqlite3.arm64.dylib"
-            SkipUnchangedFiles="true" />
-    </Target>
+    <Copy SourceFiles="@(NativeRuntime)"
+      DestinationFolder="..\..\RimSearcher_DataMod\Native\"
+      SkipUnchangedFiles="true" />
+    <Copy SourceFiles="$(PkgSQLitePCLRaw_lib_e_sqlite3)\runtimes\osx-arm64\native\libe_sqlite3.dylib"
+      DestinationFiles="..\..\RimSearcher_DataMod\Native\libe_sqlite3.arm64.dylib"
+      SkipUnchangedFiles="true" />
+  </Target>
 
 </Project>

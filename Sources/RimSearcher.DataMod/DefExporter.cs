@@ -150,7 +150,16 @@ public static class DefExporter
                         json);
 
                     var fieldTexts = new List<string>();
-                    bool fieldsCapped = DefFieldExtractor.Extract(def, defId, fieldValueInserts, nullInserts, fieldTexts);
+                    bool fieldsCapped = false;
+                    try
+                    {
+                        fieldsCapped = DefFieldExtractor.Extract(def, defId, fieldValueInserts, nullInserts, fieldTexts);
+                    }
+                    catch (Exception ex)
+                    {
+                        // 单个 Def 字段提取失败（反射/运行时状态意外）不中断整个导出：记日志，跳过该 Def 的字段索引。
+                        Log($"Field extraction failed {typeName}/{def.defName}: {ex.Message}");
+                    }
                     if (fieldsCapped)
                         Log($"Field extraction capped {typeName}/{def.defName}");
                     var ftsText = SearchTextBuilder.Build(defName, label, description, fieldTexts);

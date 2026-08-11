@@ -17,7 +17,6 @@
 
     <ItemGroup>
         <PackageReference Include="Microsoft.Data.Sqlite" Version="10.*" />
-        <!-- bundle 2.1.12：官方修复 GHSA-2m69-gcr7-jv3q（CVSS 9.8，影响 lib ≤2.1.11）的配对版（托管 2.1.12 + 原生 SQLite 3.53.3）；MDS 传递的 2.1.11 原生库带该漏洞 -->
         <PackageReference Include="SQLitePCLRaw.bundle_e_sqlite3" Version="2.1.12" />
         <PackageReference Include="ConsoleAppFramework" Version="5.*" />
     </ItemGroup>
