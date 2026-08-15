@@ -88,8 +88,8 @@ internal static class DefJsonSerializer
 
             if (value is IDictionary dictionary)
             {
-                var (declaredKeyType, declaredValueType) = PolymorphicTypeMarker.GetDeclaredDictionaryTypes(type);
-                SerializeDictionary(dictionary, builder, visited, depth, declaredKeyType, declaredValueType);
+                var (_, declaredValueType) = PolymorphicTypeMarker.GetDeclaredDictionaryTypes(type);
+                SerializeDictionary(dictionary, builder, visited, depth, declaredValueType);
                 return;
             }
 
@@ -179,7 +179,7 @@ internal static class DefJsonSerializer
         builder.Append(']');
     }
 
-    private static void SerializeDictionary(IDictionary dictionary, StringBuilder builder, HashSet<object> visited, int depth, Type? declaredKeyType, Type? declaredValueType)
+    private static void SerializeDictionary(IDictionary dictionary, StringBuilder builder, HashSet<object> visited, int depth, Type? declaredValueType)
     {
         builder.Append('{');
         bool first = true;
@@ -188,11 +188,70 @@ internal static class DefJsonSerializer
             if (!first)
                 builder.Append(',');
             first = false;
-            SerializeValue(entry.Key, builder, visited, depth + 1, declaredKeyType);
+            SerializeDictionaryKey(entry.Key, builder);
             builder.Append(':');
             SerializeValue(entry.Value, builder, visited, depth + 1, declaredValueType);
         }
         builder.Append('}');
+    }
+
+    private static void SerializeDictionaryKey(object? key, StringBuilder builder)
+    {
+        if (key == null)
+        {
+            AppendQuoted(builder, string.Empty);
+            return;
+        }
+
+        if (key is Def defReference)
+        {
+            AppendQuoted(builder, defReference.defName);
+            return;
+        }
+
+        if (key is Type typeReference)
+        {
+            AppendQuoted(builder, typeReference.FullName ?? typeReference.Name);
+            return;
+        }
+
+        if (key is string text)
+        {
+            AppendQuoted(builder, text);
+            return;
+        }
+
+        if (key is bool boolean)
+        {
+            AppendQuoted(builder, boolean ? "true" : "false");
+            return;
+        }
+
+        if (key is float single)
+        {
+            if (float.IsNaN(single)) AppendQuoted(builder, "NaN");
+            else if (float.IsPositiveInfinity(single)) AppendQuoted(builder, "Infinity");
+            else if (float.IsNegativeInfinity(single)) AppendQuoted(builder, "-Infinity");
+            else AppendQuoted(builder, single.ToString("G9", CultureInfo.InvariantCulture));
+            return;
+        }
+
+        if (key is double number)
+        {
+            if (double.IsNaN(number)) AppendQuoted(builder, "NaN");
+            else if (double.IsPositiveInfinity(number)) AppendQuoted(builder, "Infinity");
+            else if (double.IsNegativeInfinity(number)) AppendQuoted(builder, "-Infinity");
+            else AppendQuoted(builder, number.ToString("G17", CultureInfo.InvariantCulture));
+            return;
+        }
+
+        if (key is IFormattable formattable)
+        {
+            AppendQuoted(builder, formattable.ToString(null, CultureInfo.InvariantCulture));
+            return;
+        }
+
+        AppendQuoted(builder, key.ToString());
     }
 
     private static void SerializeObject(
