@@ -1,6 +1,7 @@
 using System;
 using System.Diagnostics;
 using System.IO;
+using System.Runtime.InteropServices;
 using UnityEngine;
 using Verse;
 
@@ -58,14 +59,14 @@ public class RimSearcherMod : Mod
         try
         {
             var dir = Path.GetDirectoryName(_exportPath);
-            if (Environment.OSVersion.Platform == PlatformID.Win32NT)
+            if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
             {
                 if (!string.IsNullOrEmpty(dir) && Directory.Exists(dir))
                     Process.Start("explorer.exe", "/select,\"" + _exportPath + "\"");
                 else if (Directory.Exists(_exportPath))
                     Process.Start("explorer.exe", _exportPath);
             }
-            else if (Environment.OSVersion.Platform == PlatformID.MacOSX)
+            else if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
             {
                 var target = Directory.Exists(_exportPath) ? _exportPath : dir;
                 if (!string.IsNullOrEmpty(target) && Directory.Exists(target))
