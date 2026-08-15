@@ -145,13 +145,10 @@ internal sealed class FieldRepository
             }
         }
 
-        AnnotateReferences(connection, visible);
-
         bool isTruncated = visible.Count > limit;
-        var results = visible
-            .OrderBy(v => v.FieldPath, NaturalPathComparer.Instance)
-            .Take(limit)
-            .ToList();
+        visible.Sort((a, b) => NaturalPathComparer.Instance.Compare(a.FieldPath, b.FieldPath));
+        var results = visible.Count > limit ? visible.GetRange(0, limit) : visible;
+        AnnotateReferences(connection, results);
         return new FieldListResult(results, isTruncated);
     }
 
