@@ -143,20 +143,28 @@ internal static class DefCommands
                 foreach (var property in element.EnumerateObject())
                 {
                     // "$type" 与 DataMod PolymorphicTypeMarker.Key 一致，修改时必须同步两侧。
-                    if (property.Value.ValueKind == JsonValueKind.String
-                        && (property.Name.EndsWith("Class", StringComparison.Ordinal)
-                            || property.Name == "$type"))
+                    if (property.Value.ValueKind == JsonValueKind.String)
                     {
-                        var className = property.Value.GetString();
-                        if (!string.IsNullOrEmpty(className))
-                            classNames.Add(className);
+                        if (property.Name.EndsWith("Class", StringComparison.Ordinal)
+                            || property.Name == "$type")
+                        {
+                            var className = property.Value.GetString();
+                            if (!string.IsNullOrEmpty(className))
+                                classNames.Add(className);
+                        }
                     }
-                    CollectClassFields(property.Value, classNames);
+                    else if (property.Value.ValueKind is JsonValueKind.Object or JsonValueKind.Array)
+                    {
+                        CollectClassFields(property.Value, classNames);
+                    }
                 }
                 break;
             case JsonValueKind.Array:
                 foreach (var item in element.EnumerateArray())
-                    CollectClassFields(item, classNames);
+                {
+                    if (item.ValueKind is JsonValueKind.Object or JsonValueKind.Array)
+                        CollectClassFields(item, classNames);
+                }
                 break;
         }
     }

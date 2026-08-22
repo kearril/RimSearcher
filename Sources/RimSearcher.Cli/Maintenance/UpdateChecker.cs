@@ -21,8 +21,9 @@ internal static class UpdateChecker
         try
         {
             using var response = http.GetAsync(LatestReleaseUrl).Result;
-            if (response.StatusCode != HttpStatusCode.Redirect)
-                throw new Exception($"Unexpected status: {(int)response.StatusCode}");
+            var statusCode = (int)response.StatusCode;
+            if (statusCode is < 300 or >= 400)
+                throw new Exception($"Unexpected status: {statusCode}");
 
             var location = response.Headers.Location?.ToString()
                 ?? throw new Exception("No Location header in redirect");

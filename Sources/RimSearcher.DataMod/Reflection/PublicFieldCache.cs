@@ -15,7 +15,7 @@ namespace RimSearcher.DataMod.Reflection;
 internal static class PublicFieldCache
 {
     private const BindingFlags FieldBindingFlags =
-        BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic;
+        BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.DeclaredOnly;
 
     private static readonly ConcurrentDictionary<Type, FieldInfo[]> Fields = new();
 

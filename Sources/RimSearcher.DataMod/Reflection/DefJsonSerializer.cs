@@ -300,36 +300,28 @@ internal static class DefJsonSerializer
     private static void AppendQuoted(StringBuilder builder, string? value)
     {
         builder.Append('"');
-        builder.Append(Escape(value));
-        builder.Append('"');
-    }
-
-    private static string Escape(string? value)
-    {
-        if (value == null)
-            return string.Empty;
-
-        var builder = new StringBuilder(value.Length + 4);
-        foreach (char character in value)
+        if (value != null)
         {
-            switch (character)
+            foreach (char character in value)
             {
-                case '"': builder.Append("\\\""); break;
-                case '\\': builder.Append("\\\\"); break;
-                case '\n': builder.Append("\\n"); break;
-                case '\r': builder.Append("\\r"); break;
-                case '\t': builder.Append("\\t"); break;
-                case '\b': builder.Append("\\b"); break;
-                case '\f': builder.Append("\\f"); break;
-                default:
-                    if (character < 0x20)
-                        builder.Append($"\\u{(int)character:X4}");
-                    else
-                        builder.Append(character);
-                    break;
+                switch (character)
+                {
+                    case '"': builder.Append("\\\""); break;
+                    case '\\': builder.Append("\\\\"); break;
+                    case '\n': builder.Append("\\n"); break;
+                    case '\r': builder.Append("\\r"); break;
+                    case '\t': builder.Append("\\t"); break;
+                    case '\b': builder.Append("\\b"); break;
+                    case '\f': builder.Append("\\f"); break;
+                    default:
+                        if (character < 0x20)
+                            builder.Append($"\\u{(int)character:X4}");
+                        else
+                            builder.Append(character);
+                        break;
+                }
             }
         }
-
-        return builder.ToString();
+        builder.Append('"');
     }
 }
