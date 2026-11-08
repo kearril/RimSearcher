@@ -21,7 +21,7 @@ public class RimSearcherMod : Mod
         _exportPath = Path.Combine(content.RootDir, "defs.db");
         try
         {
-            NativeLibrary.Initialize(content.RootDir);
+            SqliteNativeLoader.Initialize(content.RootDir);
         }
         catch (Exception ex)
         {
