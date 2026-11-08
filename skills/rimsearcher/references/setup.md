@@ -55,15 +55,18 @@ Ask the user once for the required information (skip items already provided or r
 2. **Dependent Mod Directories & DLLs (Optional)**: Third-party mod directories or assemblies required by this project. Record "None" if there are no dependencies; leave "Unconfirmed" if unspecified.
    - *Common reference (Steam Workshop Mods)*: `<SteamLibrary>/steamapps/workshop/content/294100`
 **Core Game DLL (`Assembly-CSharp.dll`)**:
-Once the game root is known, **automatically probe the standard path first**: `<GameRoot>/RimWorldWin64_Data/Managed/Assembly-CSharp.dll`. If present, verify and record its full path immediately without asking the user. Only ask for the DLL directory if the file is not found or the layout is non-standard.
+Once the game root is known, **probe these paths in order** and record the first one that exists, without asking the user:
+1. RimWorld 1.7 layout: `<GameRoot>/Assembly-CSharp.dll`
+2. RimWorld 1.6 fallback layout: `<GameRoot>/RimWorldWin64_Data/Managed/Assembly-CSharp.dll`
 
-Verify that `Assembly-CSharp.dll` and relevant mod DLLs actually exist on disk before recording their full paths in `.rimsearcher/README.md`. Never guess local paths.
+Only ask for the DLL directory if neither file exists or the layout is non-standard. Verify that `Assembly-CSharp.dll` and relevant mod DLLs actually exist on disk before recording their full paths in `.rimsearcher/README.md`. Never guess local paths.
 
 ## 3. Configure DecompilerServer MCP
 
 Use the client's [DecompilerServer](https://github.com/pardeike/DecompilerServer) tools to load `Assembly-CSharp.dll` and any required mod assemblies (align tool names and arguments with the active MCP definition):
+- For RimWorld 1.7, load `Assembly-CSharp.dll` by its recorded **assembly path** (`assemblyPath`). Do not rely on game-directory auto-detection (`gameDir`), which assumes the 1.6 Unity `Managed` layout.
 - Verify that the loaded context matches the recorded DLL paths.
-- Decompile or inspect a standard type (e.g. `RimWorld.Pawn`) to verify MCP communication.
+- Decompile or inspect a standard type (e.g. `Verse.Pawn`) to verify MCP communication.
 - Record only persistent DLL file paths; do not store temporary context IDs as long-term config, and do not copy game DLLs into the Skill directory.
 - If MCP is unconfigured, guide the user through their client's setup instructions.
 
