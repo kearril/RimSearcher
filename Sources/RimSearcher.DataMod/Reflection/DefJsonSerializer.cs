@@ -93,6 +93,12 @@ internal static class DefJsonSerializer
                 return;
             }
 
+            if (BclSequence.TryCopyToList(value) is { } sequence)
+            {
+                SerializeList(sequence, builder, visited, depth, PolymorphicTypeMarker.GetDeclaredElementType(type));
+                return;
+            }
+
             if (value is Type typeReference)
             {
                 AppendQuoted(builder, typeReference.FullName ?? typeReference.Name);
