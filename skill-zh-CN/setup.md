@@ -55,15 +55,18 @@
 2. **依赖模组目录与相关 DLL（可选）**：当前项目所依赖的第三方模组目录或程序集。若无依赖明确记录为“无”，未指定则保持“未确认”。
    - *常见参考（Steam 创意工坊模组目录）*：`<Steam库目录>/steamapps/workshop/content/294100`
 **关于游戏核心 DLL（Assembly-CSharp.dll）**：
-获得游戏根目录后，**优先自动探测标准路径**：`<游戏根目录>/RimWorldWin64_Data/Managed/Assembly-CSharp.dll`。若该文件存在，直接校验并记录完整路径，无需向用户追问；仅在非标准布局或找不到该文件时，再向用户询问核心 DLL 存放目录。
+获得游戏根目录后，**按以下顺序探测**，记录第一个存在的文件，无需向用户追问：
+1. RimWorld 1.7 布局：`<游戏根目录>/Assembly-CSharp.dll`
+2. RimWorld 1.6 回退布局：`<游戏根目录>/RimWorldWin64_Data/Managed/Assembly-CSharp.dll`
 
-实地校验目标路径下的 `Assembly-CSharp.dll` 与模组 DLL 真实存在后，将完整路径记录至 `.rimsearcher/README.md`。不凭空推测本机路径。
+仅当两个文件都不存在或布局非标准时，才向用户询问核心 DLL 存放目录。实地校验目标路径下的 `Assembly-CSharp.dll` 与模组 DLL 真实存在后，再将完整路径记录至 `.rimsearcher/README.md`。不凭空推测本机路径。
 
 ## 3. 准备 DecompilerServer MCP
 
 使用客户端提供的 [DecompilerServer](https://github.com/pardeike/DecompilerServer) 加载游戏核心 `Assembly-CSharp.dll` 及依赖模组的实际 DLL（工具名称与参数以当前客户端实际注入的 MCP 定义为准）：
+- RimWorld 1.7 须以已记录的**程序集路径**（`assemblyPath`）加载 `Assembly-CSharp.dll`。不依赖游戏目录自动探测（`gameDir`），该探测面向 1.6 的 Unity `Managed` 布局。
 - 校验 MCP 加载的上下文与记录的 DLL 路径一致。
-- 检索或反编译一个基础类型（如 `RimWorld.Pawn`），验证 MCP 通信与反编译链路畅通。
+- 检索或反编译一个基础类型（如 `Verse.Pawn`），验证 MCP 通信与反编译链路畅通。
 - 仅记录持久化的 DLL 文件路径；临时 context ID 不作为长期配置保存，亦不可将游戏 DLL 拷贝进 Skill 目录。
 - 若 MCP 尚未安装或配置，引导用户参考官方文档完成当前客户端的配置。
 
