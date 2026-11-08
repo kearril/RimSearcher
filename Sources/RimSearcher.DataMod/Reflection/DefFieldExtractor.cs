@@ -97,6 +97,12 @@ internal static class DefFieldExtractor
                 return;
             }
 
+            if (BclSequence.TryCopyToList(value) is { } sequence)
+            {
+                ExtractList(sequence, defId, pathPrefix, inserts, nullInserts, allTexts, visited, depth, ref count, PolymorphicTypeMarker.GetDeclaredElementType(type));
+                return;
+            }
+
             if (ReflectionTraversalPolicy.IsExcludedType(type))
                 return;
 
