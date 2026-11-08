@@ -21,6 +21,11 @@ if ($version -ne ([xml](Get-Content $modProject -Raw)).Project.PropertyGroup.Ver
     throw 'CLI, DataMod and About.xml versions must match.'
 }
 
+# Frozen 1.6 DataMod is the released 3.2.0 build: checked and packaged as-is, never rebuilt
+if ([Reflection.AssemblyName]::GetAssemblyName("$modSource/1.6/Assemblies/RimSearcher.DataMod.dll").Version.ToString(3) -ne '3.2.0') {
+    throw 'Frozen 1.6 DataMod assembly must be version 3.2.0.'
+}
+
 $work = Join-Path $releaseDir "build-skill-$([guid]::NewGuid().ToString('N'))"
 New-Item $work -ItemType Directory -Force | Out-Null
 Push-Location $root
@@ -59,6 +64,7 @@ try {
     $files = @(
         Get-Item "$modSource/About/About.xml"
         Get-Item "$modSource/LoadFolders.xml"
+        Get-ChildItem "$modSource/1.6/Assemblies" -File -Filter '*.dll'
         Get-ChildItem "$modSource/1.7/Assemblies" -File -Filter '*.dll'
         $native | ForEach-Object { Get-Item "$modSource/Native/$_" }
         $translations
