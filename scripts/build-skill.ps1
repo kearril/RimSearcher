@@ -27,28 +27,28 @@ Push-Location $root
 try {
     # 2. Build CLI & DataMod in isolated work directory
     Invoke-Dotnet publish $cliProject -c Release -r win-x64 -o "$work/cli"
-    Invoke-Dotnet build $modProject -c Release '-t:Rebuild' -o "$work/mod/Assemblies" "-p:NativeOutputPath=$work/mod/Native"
+    Invoke-Dotnet build $modProject -c Release '-t:Rebuild' -o "$work/mod/1.7/Assemblies" "-p:NativeOutputPath=$work/mod/Native"
 
     # 3. Sanity verification
     $cli = "$work/cli/rimsearcher.exe"
     $builtVersion = & $cli --version
     if ($LASTEXITCODE -ne 0 -or $builtVersion.Trim() -ne $version) { throw 'CLI startup or version check failed.' }
-    if ([Reflection.AssemblyName]::GetAssemblyName("$work/mod/Assemblies/RimSearcher.DataMod.dll").Version.ToString(3) -ne $version) {
+    if ([Reflection.AssemblyName]::GetAssemblyName("$work/mod/1.7/Assemblies/RimSearcher.DataMod.dll").Version.ToString(3) -ne $version) {
         throw 'Built DataMod version does not match CLI.'
     }
 
     $native = @('e_sqlite3.dll', 'libe_sqlite3.so', 'libe_sqlite3.dylib', 'libe_sqlite3.arm64.dylib')
-    $managed = @(Get-ChildItem "$work/mod/Assemblies" -File -Filter '*.dll')
+    $managed = @(Get-ChildItem "$work/mod/1.7/Assemblies" -File -Filter '*.dll')
     $nativeFiles = @($native | ForEach-Object { Get-Item "$work/mod/Native/$_" })
     $translations = @(Get-ChildItem "$modSource/Languages" -Recurse -File -Filter '*.xml')
     if ($translations.Count -eq 0) { throw 'DataMod translations are missing.' }
 
-    # 4. Refresh root-level mod Assemblies & Native
-    foreach ($dir in @('Assemblies', 'Native')) {
+    # 4. Refresh mod 1.7 Assemblies & shared Native
+    foreach ($dir in @('1.7/Assemblies', 'Native')) {
         if (Test-Path "$modSource/$dir") { Remove-Item "$modSource/$dir" -Recurse -Force }
         New-Item "$modSource/$dir" -ItemType Directory | Out-Null
     }
-    $managed | Copy-Item -Destination "$modSource/Assemblies"
+    $managed | Copy-Item -Destination "$modSource/1.7/Assemblies"
     $nativeFiles | Copy-Item -Destination "$modSource/Native"
 
     # 5. Package DataMod ZIP (excludes databases, PDBs, game assemblies)
@@ -58,7 +58,8 @@ try {
 
     $files = @(
         Get-Item "$modSource/About/About.xml"
-        Get-ChildItem "$modSource/Assemblies" -File -Filter '*.dll'
+        Get-Item "$modSource/LoadFolders.xml"
+        Get-ChildItem "$modSource/1.7/Assemblies" -File -Filter '*.dll'
         $native | ForEach-Object { Get-Item "$modSource/Native/$_" }
         $translations
     )
