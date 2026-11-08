@@ -8,7 +8,7 @@ obj/
 /skills/rimsearcher/bin/*
 !/skills/rimsearcher/bin/rimsearcher.exe
 
-/RimSearcher_DataMod/Assemblies/
+/RimSearcher_DataMod/1.7/Assemblies/
 /RimSearcher_DataMod/Native/
 
 .idea/
