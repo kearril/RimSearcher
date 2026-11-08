@@ -9,7 +9,7 @@ internal sealed class DatabaseConnectionFactory
 {
     // 每次发布显式维护闭区间；区间内所有已发布导出版本都必须兼容。
     private const int MinDatabaseVersion = 30105; // 3.1.5
-    private const int MaxDatabaseVersion = 30200; // 3.2.0
+    private const int MaxDatabaseVersion = 30300; // 3.3.0
 
     internal static string SupportedVersions =>
         $"{DecodeVersion(MinDatabaseVersion)} through {DecodeVersion(MaxDatabaseVersion)} (inclusive)";

@@ -1,7 +1,7 @@
 """Check a published Windows single-file CLI using isolated SQLite snapshots.
 
 Usage: python scripts/check-database-compatibility.py <exe> <min> <max>
-Example: python scripts/check-database-compatibility.py skills/rimsearcher/bin/rimsearcher.exe 3.1.5 3.2.0
+Example: python scripts/check-database-compatibility.py skills/rimsearcher/bin/rimsearcher.exe 3.1.5 3.3.0
 """
 
 from contextlib import closing
